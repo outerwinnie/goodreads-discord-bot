@@ -1,4 +1,3 @@
-from pprint import pprint
 import feedparser, logging
 from typing import TypedDict, List
 logging.basicConfig(level=logging.INFO)
@@ -14,12 +13,14 @@ class Book(TypedDict):
     image_url: str
     user_url: str
     username: str
+    # user_image_url: str
 
 
 class RSSHelper:
     def __init__(self) -> None:
         return
 
+    # Get RSS description
     def get_rss_data(self, rss_feed) -> List[Book]:
         rss_feed = feedparser.parse(rss_feed)
         books = {}
@@ -28,8 +29,9 @@ class RSSHelper:
         # Extract Username
         index = rss_feed.feed.title.find("'s Updates")
         username = rss_feed.feed.title[:index].rstrip()
-        logging.info(username)
+        # logging.info(username)
 
+        # Get stars position
         for i, entry in enumerate(rss_feed.entries):
             info = entry.description
             # print(summary)
@@ -38,7 +40,8 @@ class RSSHelper:
             stars_position = info.find('stars to <a class="bookTitle"')
             is_starred = star_position != -1 or stars_position != -1
 
-            if is_starred:  # Only reviews with Stars
+            # Only reviews with Stars
+            if is_starred:
                 id += 1
 
                 # Extract Title
@@ -57,13 +60,13 @@ class RSSHelper:
                 # Extract Images
                 image_url = info[info.find('src=') + 5: info.find('" title')]
 
-                # Extract URL - TO DO
+                # Extract URL
                 url = info[9: info.find('">')]
 
                 # Extract User URL
                 user_url = rss_feed_url.replace("updates_rss", "show")
 
-                #print(username)
+                # print(username)
 
                 books[id]: Book = {
                     "title": title,
@@ -73,6 +76,7 @@ class RSSHelper:
                     "image_url": image_url,
                     "user_url": user_url,
                     "username": username
+                    # "user_image_url" : user_image_url
                 }
 
         # print("reviews: ", books)
@@ -80,6 +84,6 @@ class RSSHelper:
         return books
 
 
+# Dependant Variables
 rsh = RSSHelper()
-# titles = rsh.get_rss_titles(rss_feed_url)
-info = rsh.get_rss_data(rss_feed_url)
+# info = rsh.get_rss_data(rss_feed_url)
