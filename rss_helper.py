@@ -2,7 +2,6 @@ import feedparser, logging
 from typing import TypedDict, List
 import requests
 from bs4 import BeautifulSoup
-import csv
 
 logging.basicConfig(level=logging.INFO)
 
@@ -38,59 +37,63 @@ class RSSHelper:
         reviews = {}
         id = 0
         for user_id in users:
-            rss_feed_url = f'https://www.goodreads.com/user/updates_rss/{user_id}'
 
-            rss_feed = feedparser.parse(rss_feed_url)
+            try:
+                rss_feed_url = f'https://www.goodreads.com/user/updates_rss/{user_id}'
 
-            # Extract Username
-            index = rss_feed.feed.title.find("'s Updates")
-            username = rss_feed.feed.title[:index].rstrip()
-            # logging.info(username)
+                rss_feed = feedparser.parse(rss_feed_url)
 
-            # Get stars position
-            for i, entry in enumerate(rss_feed.entries):
-                info = entry.description
-                second_href = info[info[info.find("href") + 1:].find("href"):]
-                star_position = info.find('star to <a class="bookTitle"')
-                stars_position = info.find('stars to <a class="bookTitle"')
-                is_starred = star_position != -1 or stars_position != -1
+                # Extract Username
+                index = rss_feed.feed.title.find("'s Updates")
+                username = rss_feed.feed.title[:index].rstrip()
+                # logging.info(username)
 
-                # Only reviews with Stars
-                if is_starred:
-                    id += 1
+                # Get stars position
+                for i, entry in enumerate(rss_feed.entries):
+                    info = entry.description
+                    second_href = info[info[info.find("href") + 1:].find("href"):]
+                    star_position = info.find('star to <a class="bookTitle"')
+                    stars_position = info.find('stars to <a class="bookTitle"')
+                    is_starred = star_position != -1 or stars_position != -1
 
-                    # Extract Title
-                    title = second_href[second_href.find(">") + 1: second_href.find("</a>")]
+                    # Only reviews with Stars
+                    if is_starred:
+                        id += 1
 
-                    # Extract Author
-                    author_extract = second_href[second_href.find('<a class="authorName"'):]
-                    author = author_extract[author_extract.find(">") + 1: author_extract.find("</a>")]
+                        # Extract Title
+                        title = second_href[second_href.find(">") + 1: second_href.find("</a>")]
 
-                    # Extract Score
-                    if star_position != -1:
-                        score = info[star_position - 2: star_position].strip()
-                    elif stars_position != -1:
-                        score = info[stars_position - 2: stars_position].strip()
+                        # Extract Author
+                        author_extract = second_href[second_href.find('<a class="authorName"'):]
+                        author = author_extract[author_extract.find(">") + 1: author_extract.find("</a>")]
 
-                    # Extract Images
-                    image_url = info[info.find('src=') + 5: info.find('" title')]
+                        # Extract Score
+                        if star_position != -1:
+                            score = info[star_position - 2: star_position].strip()
+                        elif stars_position != -1:
+                            score = info[stars_position - 2: stars_position].strip()
 
-                    # Extract URL
-                    url = info[9: info.find('">')]
+                        # Extract Images
+                        image_url = info[info.find('src=') + 5: info.find('" title')]
 
-                    # Extract User URL
-                    user_url = rss_feed_url.replace("updates_rss", "show")
+                        # Extract URL
+                        url = info[9: info.find('">')]
 
-                    reviews[id]: Review = {
-                        "title": title,
-                        "score": int(score),
-                        "author": author,
-                        "url": url,
-                        "image_url": image_url,
-                        "user_url": user_url,
-                        "username": username,
-                        "user_image_url": get_user_image(user_id)
-                    }
+                        # Extract User URL
+                        user_url = rss_feed_url.replace("updates_rss", "show")
+
+                        reviews[id]: Review = {
+                            "title": title,
+                            "score": int(score),
+                            "author": author,
+                            "url": url,
+                            "image_url": image_url,
+                            "user_url": user_url,
+                            "username": username,
+                            "user_image_url": get_user_image(user_id)
+                        }
+            except:
+                None
 
         return reviews
 
