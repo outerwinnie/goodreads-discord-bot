@@ -2,13 +2,13 @@ import discord, logging
 from typing import List
 
 import rss_helper
-from rss_helper import RSSHelper, Book
+from rss_helper import RSSHelper, Review
 
 logging.basicConfig(level=logging.INFO)
 
 # Variables
 rsh = RSSHelper()
-books: List[Book] = rsh.get_rss_data(rss_helper.rss_feed_url)
+reviews: List[Review] = rsh.get_rss_data(rss_helper.rss_feed_url)
 intents = discord.Intents.default()
 intents.message_content = True
 
@@ -28,17 +28,17 @@ class MyClient(discord.Client):
         # React to !read with the new book changes
         if message.content.startswith('!read'):
             i: int
-            for i in books:
+            for i in reviews:
                 score_star = ''
-                for x in range(books[i]['score']):
+                for x in range(reviews[i]['score']):
                     score_star += '★'
 
-                embed = discord.Embed(title=books[i]['title'] + ' ' + score_star,
-                                      description=books[i]['author'],
-                                      url=books[i]['url'])
-                embed.set_author(name=books[i]['username'],
-                                 url=books[i]["user_url"])
-                embed.set_thumbnail(url=books[i]['image_url'])
+                embed = discord.Embed(title=reviews[i]['title'] + ' ' + score_star,
+                                      description=reviews[i]['author'],
+                                      url=reviews[i]['url'])
+                embed.set_author(name=reviews[i]['username'],
+                                 url=reviews[i]["user_url"])
+                embed.set_thumbnail(url=reviews[i]['image_url'])
                 await message.reply(embed=embed, mention_author=True)
 
 

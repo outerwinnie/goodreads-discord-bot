@@ -1,11 +1,16 @@
 import feedparser, logging
 from typing import TypedDict, List
+import requests
+from bs4 import BeautifulSoup
 logging.basicConfig(level=logging.INFO)
 
-rss_feed_url = 'https://www.goodreads.com/user/updates_rss/35497141'
+
+USER_ID = 35497141 # TO DO, Placeholder, Discord
+
+rss_feed_url = f'https://www.goodreads.com/user/updates_rss/{USER_ID}'
 
 
-class Book(TypedDict):
+class Review(TypedDict):
     title: str
     score: int
     author: str
@@ -13,17 +18,32 @@ class Book(TypedDict):
     image_url: str
     user_url: str
     username: str
-    # user_image_url: str
+    user_image_url: str
+
+
+def get_user_image(user_id : int) -> str:
+    user_url = f"https://www.goodreads.com/user/show/{user_id}" #f-string
+    page = requests.get(user_url)
+    soup = BeautifulSoup(page.content, "html.parser")
+    picture_elements = soup.find("div", class_="leftAlignedProfilePicture").find("a")
+    for element in picture_elements:
+        if element is not None:
+            user_image_url = element["src"]
+        else:
+            user_image_url = None
+    return user_image_url
 
 
 class RSSHelper:
-    def __init__(self) -> None:
-        return
 
     # Get RSS description
-    def get_rss_data(self, rss_feed) -> List[Book]:
+    def get_rss_data(self, rss_feed) -> List[Review]:
+        """
+        Esta función envía nudes de hmmm de choicolate pero no hmmmm de hombres asbes
+
+        """
         rss_feed = feedparser.parse(rss_feed)
-        books = {}
+        reviews = {}
         id = 0
 
         # Extract Username
@@ -66,24 +86,25 @@ class RSSHelper:
                 # Extract User URL
                 user_url = rss_feed_url.replace("updates_rss", "show")
 
+
                 # print(username)
 
-                books[id]: Book = {
+                reviews[id]: Review = {
                     "title": title,
                     "score": int(score),
                     "author": author,
                     "url": url,
                     "image_url": image_url,
                     "user_url": user_url,
-                    "username": username
-                    # "user_image_url" : user_image_url
+                    "username": username,
+                    "user_image_url" : get_user_image(USER_ID)
                 }
 
-        # print("reviews: ", books)
 
-        return books
+        return reviews
 
 
 # Dependant Variables
 rsh = RSSHelper()
 # info = rsh.get_rss_data(rss_feed_url)
+
