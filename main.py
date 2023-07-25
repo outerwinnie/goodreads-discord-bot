@@ -72,7 +72,7 @@ tree = app_commands.CommandTree(client)
 @tree.command(guild=discord.Object(id=757271564227182602), name='add', description='Add User')  # guild specific
 # slash command
 async def add_user(interaction: discord.Interaction, user_id_input: int):
-    await interaction.response.send_message(f"Añadido!", ephemeral=True)
+    await interaction.response.send_message(f"¡Añadido!", ephemeral=True)
 
     with open("data/users.txt", "a") as file:
         if user_id_input not in users:
@@ -82,7 +82,7 @@ async def add_user(interaction: discord.Interaction, user_id_input: int):
 
 @tree.command(guild=discord.Object(id=GUILD_ID), name='remove', description='Remove User')  # guild specific
 async def remove_user(interaction: discord.Interaction, user_id_input: int):
-    await interaction.response.send_message(f"Eliminado!", ephemeral=True)
+    await interaction.response.send_message(f"¡Eliminado!", ephemeral=True)
 
     with open("data/users.txt", "r") as file:
         new_users_list = [line for line in file]
