@@ -6,11 +6,16 @@ from rss_helper import RSSHelper, Review
 
 logging.basicConfig(level=logging.INFO)
 
+# Importing Users
+with open("data/users.txt", "r") as file:
+    users = [int(line) for line in file]
+
 # Variables
 rsh = RSSHelper()
-reviews: List[Review] = rsh.get_rss_data(rss_helper.rss_feed_url)
+reviews: List[Review] = rsh.get_rss_data(users)
 intents = discord.Intents.default()
 intents.message_content = True
+
 
 
 # Connecting with Discord
