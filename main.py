@@ -17,7 +17,6 @@ intents = discord.Intents.default()
 intents.message_content = True
 
 
-
 # Connecting with Discord
 
 class MyClient(discord.Client):
