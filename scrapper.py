@@ -11,9 +11,8 @@ books: List[Book] = rsh.get_rss_data(rss_feed)
 
 for i in books:
     # URL = books[i]["user_url"]
-    URL = "https://www.goodreads.com/photo/user/50670314-winnie"
+    URL = "https://www.goodreads.com/user/show/35497141-marc-cejalvo"
     page = requests.get(URL)
     soup = BeautifulSoup(page.content, "html.parser")
-    result = soup.find(href="https://images.gr-assets.com/users/")
-    print(soup.text)
-
+    picture_elements = soup.find_all("div", class_="leftAlignedProfilePicture")
+    print(picture_elements)
