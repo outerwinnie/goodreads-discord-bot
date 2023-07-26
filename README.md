@@ -1,6 +1,6 @@
 # Goodreads-Bot
-#
-#
+
+
 #  TO-DO
 #  - Chequeo cada 30 minutos
 #  - Discord enviar libros nuevos, sin comando
