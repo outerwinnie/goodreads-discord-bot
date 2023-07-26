@@ -4,15 +4,17 @@ from discord import app_commands
 from typing import List
 from rss_helper import RSSHelper, Review
 
-# Importing Users
+# Importing keys
 with open("data/config.txt", "r") as file:
     keys = [line for line in file]
 
 DISCORD_TOKEN = keys[0]
 GUILD_ID = keys[1]
-CHANNEL_ID = keys[2]
+CHANNEL_ID = int(keys[2])
 
 logging.basicConfig(level=logging.INFO)
+
+users: List
 
 # Importing Users
 with open("data/users.txt", "r") as file:
@@ -81,7 +83,6 @@ async def add_user(interaction: discord.Interaction, user_id_input: int):
     with open("data/users.txt", "a") as file:
         if user_id_input not in users:
             file.writelines("\n" + str(user_id_input))
-    print(user_id_input)
 
 
 @tree.command(guild=discord.Object(id=GUILD_ID), name='remove', description='Remove User')  # guild specific
