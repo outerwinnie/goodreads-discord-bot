@@ -9,4 +9,5 @@
 
 
 #  MAYBE
+#  - Añadir la review completa
 #  - Integracion de la creacion de imagenes de Docker con Github CI
