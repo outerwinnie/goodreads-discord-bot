@@ -14,8 +14,6 @@ CHANNEL_ID = int(keys[2])
 
 logging.basicConfig(level=logging.INFO)
 
-users: List
-
 # Importing Users
 with open("data/users.txt", "r") as file:
     users = [int(line) for line in file]
