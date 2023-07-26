@@ -1,6 +1,6 @@
 FROM python:3.11
 
-ADD main.py .
+ADD old_main.py .
 ADD rss_helper.py .
 ADD scrapper.py .
 COPY data /data/
