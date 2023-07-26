@@ -1,5 +1,6 @@
-import feedparser, logging
 from typing import TypedDict, List
+import feedparser
+import logging
 import requests
 from bs4 import BeautifulSoup
 

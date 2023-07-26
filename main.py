@@ -4,9 +4,13 @@ from discord import app_commands
 from typing import List
 from rss_helper import RSSHelper, Review
 
-DISCORD_TOKEN = 'MTEzMzA0MTYxNzg4MDc2MDQ1MQ.GzeSxH.bWdrgje2rF7EOXhfOLs-hi23nhKAOsz7r9KkQs'
-GUILD_ID = 757271564227182602
-CHANNEL_ID = 815716163102179350
+# Importing Users
+with open("data/config.txt", "r") as file:
+    keys = [line for line in file]
+
+DISCORD_TOKEN = keys[0]
+GUILD_ID = keys[1]
+CHANNEL_ID = keys[2]
 
 logging.basicConfig(level=logging.INFO)
 
