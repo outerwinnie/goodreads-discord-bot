@@ -3,6 +3,9 @@ import logging
 from discord import app_commands
 from typing import List
 from rss_helper import RSSHelper, Review
+import datetime
+
+time = datetime.datetime.now
 
 # Importing keys
 with open("data/config.txt", "r") as file:
@@ -31,10 +34,15 @@ class UpdatesClient(discord.Client):
     def __init__(self):
         super().__init__(intents=intents)
         self.synced = False
+        self.msg_sent = False
 
     async def on_ready(self):
         logging.info(f'Logged in as {self.user} (ID: {self.user.id})')
         logging.info('------')
+
+
+        channel = bot.get_channel(CHANNEL_ID)
+        await self.timer.start(channel)
 
         await self.wait_until_ready()
         if not self.synced:  # check if slash commands have been synced
@@ -42,8 +50,30 @@ class UpdatesClient(discord.Client):
                 id=GUILD_ID))  # guild specific: leave blank if global (global registration can take 1-24 hours)
             self.synced = True
 
-    # Avoid reply to himself
+    # Define timer
+    @tasks.loop(seconds=1)
+    async def timer(self, channel):
+        if time().hour == 7 and time().minute == 0: # Message at 7 am
+            if not self.msg_sent:
+                await channel.send('Update Triggered!')
+                i: int
+                for i in reviews:
+                    score_star = ''
+                    for x in range(reviews[i]['score']):
+                        score_star += '★'
 
+                    embed = discord.Embed(title=reviews[i]['title'] + ' ' + score_star,
+                                          description=reviews[i]['author'],
+                                          url=reviews[i]['url'])
+                    embed.set_author(name=reviews[i]['username'],
+                                     url=reviews[i]["user_url"], icon_url=reviews[i]["user_image_url"])
+                    embed.set_thumbnail(url=reviews[i]['image_url'])
+                    await message.reply(embed=embed, mention_author=True)
+                self.msg_sent = True
+        else:
+            self.msg_sent = False
+
+    # Avoid reply to himself
     async def on_message(self, message):
         if message.author.id == self.user.id:
             return
