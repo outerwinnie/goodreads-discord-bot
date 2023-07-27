@@ -4,8 +4,10 @@ from discord.ext import commands, tasks
 import datetime
 import logging
 import os
+from rich.logging import RichHandler
 from typing import List
 from rss_helper import RSSHelper, Review
+
 
 time = datetime.datetime.now
 logging.basicConfig(level=logging.INFO)
