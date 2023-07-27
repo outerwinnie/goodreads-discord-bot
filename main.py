@@ -7,6 +7,8 @@ import os
 from typing import List
 from rss_helper import RSSHelper, Review
 
+#RESTORE
+
 time = datetime.datetime.now
 logging.basicConfig(level=logging.INFO)
 
