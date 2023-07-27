@@ -7,7 +7,7 @@ from typing import List
 from rss_helper import RSSHelper, Review
 
 time = datetime.datetime.now
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 # Importing keys
 with open("data/config.txt", "r") as file:
@@ -62,8 +62,6 @@ class UpdatesClient(commands.Bot):
                     score_star = ''
                     for x in range(reviews[i]['score']):
                         score_star += '★'
-                    # if reviews[i]["user_image_url"] == "":
-                    #     reviews[i]["user_image_url"] = "https://images.gr-assets.com/users/1567178282p6/102039931.jpg"
 
                     embed = discord.Embed(title=reviews[i]['title'] + ' ' + score_star,
                                           description=reviews[i]['author'],
@@ -76,8 +74,6 @@ class UpdatesClient(commands.Bot):
                 self.msg_sent = True
         else:
             self.msg_sent = False
-            logging.debug(f"Nada que enviar para {reviews[i]['username']}")
-
 
 client = UpdatesClient(command_prefix='!', intents=discord.Intents().all())
 channel = client.get_channel(CHANNEL_ID)

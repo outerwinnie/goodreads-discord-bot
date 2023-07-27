@@ -6,7 +6,7 @@ import logging
 import requests
 from bs4 import BeautifulSoup
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 
 class Review(TypedDict):
@@ -42,7 +42,6 @@ class RSSHelper:
         reviews = {}
         id = 0
         for user_id in users:
-            print(users)
             try:
                 rss_feed_url = f'https://www.goodreads.com/user/updates_rss/{user_id}'
 
@@ -55,9 +54,6 @@ class RSSHelper:
                 username = rss_feed.feed.title[:index].rstrip()
                 logging.debug(f"Nombre de usuario {username}")
                 logging.debug(f"{rss_feed.feed}")
-
-                for entry in rss_feed.entries:
-                    print(entry)
 
                 # Get stars position
                 for i, entry in enumerate(rss_feed.entries):
@@ -99,6 +95,11 @@ class RSSHelper:
                             # Extract User URL
                             user_url = rss_feed_url.replace("updates_rss", "show")
 
+                            try:
+                                user_image_url = get_user_image(user_id)
+                            except:
+                                user_image_url = "https://i.imgur.com/9pNffkj.png"
+
                             reviews[id]: Review = {
                                 "title": title,
                                 "score": int(score),
@@ -107,7 +108,7 @@ class RSSHelper:
                                 "image_url": image_url,
                                 "user_url": user_url,
                                 "username": username,
-                                "user_image_url": get_user_image(user_id)
+                                "user_image_url": user_image_url
                             }
                             logging.debug(f"Contenido de la review {username} {title}")
                     except Exception as error:
