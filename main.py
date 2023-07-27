@@ -3,18 +3,23 @@ import discord
 from discord.ext import commands, tasks
 import datetime
 import logging
+from rich.logging import RichHandler
+from rich import print
 import os
 from typing import List
 from rss_helper import RSSHelper, Review
 
 time = datetime.datetime.now
-logging.basicConfig(level=logging.INFO)
+FORMAT = "%(message)s"
+logging.basicConfig(level=logging.DEBUG, format=FORMAT, datefmt="[%X]",
+                    handlers=[RichHandler(markup=True, rich_tracebacks=True)])
+log = logging.getLogger("rich")
 
 # Importing keys
 with open("data/config.txt", "r") as file:
     keys = [line for line in file]
 
-logging.debug("Arranca")
+log.info(":books: Discord GoodReads Bot Start :books:")
 
 try:
     DISCORD_TOKEN = os.environ['DISCORD_TOKEN']
@@ -25,7 +30,7 @@ except:
     GUILD_ID = keys[1]
     CHANNEL_ID = int(keys[2])
 
-logging.debug(f"Este es el ID del canal {CHANNEL_ID}")
+log.debug(f"Este es el ID del canal {CHANNEL_ID}")
 
 # Importing Users
 with open("data/users.txt", "r") as file:
@@ -53,12 +58,12 @@ class UpdatesClient(commands.Bot):
             await tree.sync(guild=discord.Object(
                 id=GUILD_ID))  # guild specific: leave blank if global (global registration can take 1-24 hours)
             self.synced = True
-            logging.debug("Conectado")
-        logging.debug("No Conectado")
+            log.debug("Conectado")
+        log.debug("No Conectado")
 
     @tasks.loop(seconds=5)
     async def timer(self, channel):
-        logging.debug("Starting timer")
+        log.debug("Starting timer")
         # if time().minute == 0 or time().minute == 30:
         if random.randrange(0, 2) == 1:
             if not self.msg_sent:
@@ -74,7 +79,7 @@ class UpdatesClient(commands.Bot):
                     embed.set_author(name=reviews[i]['username'],
                                      url=reviews[i]["user_url"], icon_url=reviews[i]["user_image_url"])
                     embed.set_thumbnail(url=reviews[i]['image_url'])
-                    logging.debug(f"Review enviada de {reviews[i]['username']}")
+                    log.debug(f"Review enviada de {reviews[i]['username']}")
                     await channel.send(embed=embed, mention_author=True)
                 self.msg_sent = True
         else:
