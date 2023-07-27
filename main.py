@@ -3,6 +3,7 @@ import discord
 from discord.ext import commands, tasks
 import datetime
 import logging
+import os
 from typing import List
 from rss_helper import RSSHelper, Review
 
@@ -14,13 +15,17 @@ with open("data/config.txt", "r") as file:
     keys = [line for line in file]
 
 logging.debug("Arranca")
-DISCORD_TOKEN = keys[0]
-GUILD_ID = keys[1]
-CHANNEL_ID = int(keys[2])
+
+try:
+    DISCORD_TOKEN = os.environ['DISCORD_TOKEN']
+    GUILD_ID = os.environ['GUILD_ID']
+    CHANNEL_ID = int(os.environ['CHANNEL_ID'])
+except:
+    DISCORD_TOKEN = keys[0]
+    GUILD_ID = keys[1]
+    CHANNEL_ID = int(keys[2])
 
 logging.debug(f"Este es el ID del canal {CHANNEL_ID}")
-
-
 
 # Importing Users
 with open("data/users.txt", "r") as file:
@@ -74,6 +79,7 @@ class UpdatesClient(commands.Bot):
                 self.msg_sent = True
         else:
             self.msg_sent = False
+
 
 client = UpdatesClient(command_prefix='!', intents=discord.Intents().all())
 channel = client.get_channel(CHANNEL_ID)
