@@ -8,7 +8,6 @@ from bs4 import BeautifulSoup
 
 logging.basicConfig(level=logging.INFO)
 
-
 class Review(TypedDict):
     title: str
     score: int
@@ -125,4 +124,8 @@ rsh = RSSHelper()
 
 # Debug
 # info = rsh.get_rss_data([50670314, 35497141])
-# print(info)
+user_id = 50670314
+rss_feed = feedparser.parse(rss_feed_url, referrer="http://google.com")
+rss_feed_url = f'https://www.goodreads.com/user/updates_rss/{user_id}'
+index = rss_feed.feed.title.find("'s Updates")
+print(index)
