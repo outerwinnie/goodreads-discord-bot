@@ -4,10 +4,16 @@ from typing import TypedDict, List
 import feedparser
 import logging
 import requests
+from rich.logging import RichHandler
 from bs4 import BeautifulSoup
+from configuration import LOGLEVEL
 
-logging.basicConfig(level=logging.INFO)
-
+FORMAT = "%(message)s"
+logging.basicConfig(level=LOGLEVEL,
+                    format=FORMAT,
+                    datefmt="[%X]",
+                    handlers=[RichHandler(markup=True, rich_tracebacks=True)])
+log = logging.getLogger("rich")
 
 class Review(TypedDict):
     title: str
@@ -28,10 +34,10 @@ def get_user_image(user_id: int) -> str:
     for element in picture_elements:
         if element is not None:
             user_image_url = element["src"]
-            logging.debug(f"URL found for {user_id} : {user_image_url}")
+            log.debug(f"URL found for {user_id} : {user_image_url}")
         else:
             user_image_url = None
-            logging.debug(f"Not found {user_id} : {user_image_url}")
+            log.debug(f"Not found {user_id} : {user_image_url}")
     return user_image_url
 
 
@@ -47,34 +53,33 @@ class RSSHelper:
 
                 feedparser.USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0"
                 rss_feed = feedparser.parse(rss_feed_url, referrer="http://google.com")
-                logging.debug(f"Estado del parser {rss_feed.status}")
+                log.debug(f"Parser HTML status: {rss_feed.status}")
 
                 # Extract Username
                 index = rss_feed.feed.title.find("'s Updates")
                 username = rss_feed.feed.title[:index].rstrip()
-                logging.debug(f"Nombre de usuario {username}")
-                logging.debug(f"{rss_feed.feed}")
+                log.debug(f"Found user: {username}")
+                # log.debug(f"{rss_feed.feed}")
 
                 # Get stars position
                 for i, entry in enumerate(rss_feed.entries):
                     try:
-                        logging.debug(f"Entry: {entry}")
-                        logging.debug(f"Entry description: {entry.description}")
+                        # log.debug(f"Entry: {entry}")
+                        # log.debug(f"Entry description: {entry.description}")
                         info = entry.description
-                        logging.debug(f"RSS {info}")
                         second_href = info[info[info.find("href") + 1:].find("href"):]
                         star_position = info.find('star to <a class="bookTitle"')
                         stars_position = info.find('stars to <a class="bookTitle"')
                         is_starred = star_position != -1 or stars_position != -1
 
                         # Only reviews with Stars
-                        logging.debug(f"Hay estrella? Su posicion? {is_starred} {stars_position}")
+                        # log.debug(f"Star found? {is_starred} Position? {stars_position}")
                         if is_starred:
                             id += 1
 
                             # Extract Title
                             title = second_href[second_href.find(">") + 1: second_href.find("</a>")]
-                            logging.debug(f"Titulo {title}")
+                            log.debug(f"Title found: {title}")
 
                             # Extract Author
                             author_extract = second_href[second_href.find('<a class="authorName"'):]
@@ -110,12 +115,12 @@ class RSSHelper:
                                 "username": username,
                                 "user_image_url": user_image_url
                             }
-                            logging.debug(f"Contenido de la review {username} {title}")
+                            log.debug(f"Review found from: {username} for: {title}")
                     except Exception as error:
-                        logging.debug(f"Entrada malota: {entry}")
+                        log.debug(f"Bad entry: {entry}")
             except Exception as error:
                 # logging.error(traceback.format_exc())
-                logging.debug(f"No se ha podido conectar al RSS https://www.goodreads.com/user/updates_rss/{user_id}")
+                log.warning(f"Couldn't connect to RSS https://www.goodreads.com/user/updates_rss/{user_id}")
 
         return reviews
 
