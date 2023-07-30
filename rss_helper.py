@@ -5,26 +5,20 @@ from typing import TypedDict, List
 import feedparser
 import logging
 import requests
-<<<<<<< HEAD
 import datetime
-=======
 from rich.logging import RichHandler
->>>>>>> 66513f8c4e39f554eebfde47b3c9d3efc883e718
 from bs4 import BeautifulSoup
 from configuration import LOGLEVEL
 
-<<<<<<< HEAD
 logging.basicConfig(level=logging.INFO)
 USERS_JSON_FILE_PATH = "data/users.json"
 
-=======
 FORMAT = "%(message)s"
 logging.basicConfig(level=LOGLEVEL,
                     format=FORMAT,
                     datefmt="[%X]",
                     handlers=[RichHandler(markup=True, rich_tracebacks=True)])
 log = logging.getLogger("rich")
->>>>>>> 66513f8c4e39f554eebfde47b3c9d3efc883e718
 
 class Review(TypedDict):
     title: str

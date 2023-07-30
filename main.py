@@ -42,7 +42,6 @@ except:
     GUILD_ID = keys[1]
     CHANNEL_ID = int(keys[2])
 
-<<<<<<< HEAD
 USERS_JSON_FILE_PATH = "data/users.json"
 
 logging.debug(f"Este es el ID del canal {CHANNEL_ID}")
@@ -52,14 +51,12 @@ logging.debug(f"Este es el ID del canal {CHANNEL_ID}")
 f = open(USERS_JSON_FILE_PATH)
 data = json.load(f)
 users = [int(user['id']) for user in data["users"]]
-=======
 log.info(f":books: Starting Discord Bot on ChannelID {CHANNEL_ID} :books:")
 
 # Importing Users
 with open("data/users.txt", "r") as file:
     lines = file.readlines()
     users = [int(line.strip()) for line in lines]
->>>>>>> 66513f8c4e39f554eebfde47b3c9d3efc883e718
 
 # Variables
 rsh = RSSHelper()
@@ -121,7 +118,6 @@ async def add_user(interaction: discord.Interaction, user_input_url: str):
     global users
     global reviews
 
-<<<<<<< HEAD
     data = get_data_from_users_json()
     users_id = [user["id"] for user in data["users"]]
     for user_id in users_id:
@@ -132,7 +128,7 @@ async def add_user(interaction: discord.Interaction, user_input_url: str):
             })
 
     write_to_users_json(data)
-=======
+
     user_id = extract_user_id_from_url(user_input_url)
     if user_id == -1:
         await interaction.response.send_message("URL not supported!", ephemeral=True)
@@ -148,7 +144,6 @@ async def add_user(interaction: discord.Interaction, user_input_url: str):
         log.info(f"User {user_id} added!")
         log.info(f"Current user list {users}")
         reviews = rsh.get_rss_data(users)
->>>>>>> 66513f8c4e39f554eebfde47b3c9d3efc883e718
 
 @tree.command(guild=discord.Object(id=GUILD_ID), name='remove', description='Remove User')  # guild specific
 async def remove_user(interaction: discord.Interaction, user_input_url: str):
@@ -156,7 +151,7 @@ async def remove_user(interaction: discord.Interaction, user_input_url: str):
     global reviews
     global users
     users = []
-<<<<<<< HEAD
+
     await interaction.response.send_message("¡Eliminado!", ephemeral=True)
 
     data = get_data_from_users_json()
@@ -164,7 +159,7 @@ async def remove_user(interaction: discord.Interaction, user_input_url: str):
     for i, user in enumerate(data["users"]):
         if user["id"] == user_id_input:
             del data["users"][i]
-=======
+
     user_id = int(extract_user_id_from_url(user_input_url))
     if user_id == -1:
         await interaction.response.send_message("URL not supported!", ephemeral=True)
@@ -203,7 +198,6 @@ def extract_user_id_from_url(url):
         log.error(f"URL not supported!")
         return -1
   
->>>>>>> 66513f8c4e39f554eebfde47b3c9d3efc883e718
 
     write_to_users_json(data)
 
