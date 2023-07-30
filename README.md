@@ -2,7 +2,7 @@
 
 
 ##  TO-DO
-- JSON(?) ultimo libro guardado, comprobacion de libros nuevos
+- Arreglar el añadir y eliminar usuarios
 
 
 ##  MAYBE
