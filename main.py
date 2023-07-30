@@ -1,4 +1,5 @@
 import random
+import json
 import discord
 from discord.ext import commands, tasks
 import datetime
@@ -11,6 +12,7 @@ from rich.traceback import install
 from typing import List
 from configuration import LOGLEVEL
 from rss_helper import RSSHelper, Review
+from rss_helper import get_data_from_users_json, write_to_users_json
 
 FORMAT = "%(message)s"
 logging.basicConfig(level=LOGLEVEL,
@@ -40,6 +42,15 @@ except:
     GUILD_ID = keys[1]
     CHANNEL_ID = int(keys[2])
 
+USERS_JSON_FILE_PATH = "data/users.json"
+
+logging.debug(f"Este es el ID del canal {CHANNEL_ID}")
+
+# Importing Users
+
+f = open(USERS_JSON_FILE_PATH)
+data = json.load(f)
+users = [int(user['id']) for user in data["users"]]
 log.info(f":books: Starting Discord Bot on ChannelID {CHANNEL_ID} :books:")
 
 # Importing Users
@@ -52,7 +63,6 @@ rsh = RSSHelper()
 reviews: List[Review] = rsh.get_rss_data(users)
 intents = discord.Intents.default()
 intents.message_content = True
-
 
 # Connecting with Discord
 class UpdatesClient(commands.Bot):
@@ -108,6 +118,17 @@ async def add_user(interaction: discord.Interaction, user_input_url: str):
     global users
     global reviews
 
+    data = get_data_from_users_json()
+    users_id = [user["id"] for user in data["users"]]
+    for user_id in users_id:
+        if user_id not in users:
+            data["users"].append({
+                "id" : user_id,
+                "last_review_ts" : datetime.datetime.now()
+            })
+
+    write_to_users_json(data)
+
     user_id = extract_user_id_from_url(user_input_url)
     if user_id == -1:
         await interaction.response.send_message("URL not supported!", ephemeral=True)
@@ -130,6 +151,15 @@ async def remove_user(interaction: discord.Interaction, user_input_url: str):
     global reviews
     global users
     users = []
+
+    await interaction.response.send_message("¡Eliminado!", ephemeral=True)
+
+    data = get_data_from_users_json()
+
+    for i, user in enumerate(data["users"]):
+        if user["id"] == user_id_input:
+            del data["users"][i]
+
     user_id = int(extract_user_id_from_url(user_input_url))
     if user_id == -1:
         await interaction.response.send_message("URL not supported!", ephemeral=True)
@@ -169,6 +199,7 @@ def extract_user_id_from_url(url):
         return -1
   
 
+    write_to_users_json(data)
 
 # Update Reviews
 client.run(DISCORD_TOKEN)
