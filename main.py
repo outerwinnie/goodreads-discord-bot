@@ -47,16 +47,10 @@ USERS_JSON_FILE_PATH = "data/users.json"
 logging.debug(f"Este es el ID del canal {CHANNEL_ID}")
 
 # Importing Users
-
 f = open(USERS_JSON_FILE_PATH)
 data = json.load(f)
 users = [int(user['id']) for user in data["users"]]
 log.info(f":books: Starting Discord Bot on ChannelID {CHANNEL_ID} :books:")
-
-# Importing Users
-with open("data/users.txt", "r") as file:
-    lines = file.readlines()
-    users = [int(line.strip()) for line in lines]
 
 # Variables
 rsh = RSSHelper()
@@ -117,33 +111,28 @@ async def add_user(interaction: discord.Interaction, user_input_url: str):
     await interaction.response.send_message("¡Añadido!", ephemeral=True)
     global users
     global reviews
-
+    user_id = extract_user_id_from_url(user_input_url)
+    
     data = get_data_from_users_json()
     users_id = [user["id"] for user in data["users"]]
-    for user_id in users_id:
-        if user_id not in users:
-            data["users"].append({
-                "id" : user_id,
-                "last_review_ts" : datetime.datetime.now()
-            })
-
+    if user_id not in users_id:
+        data["users"].append({
+            "id" : user_id,
+            "last_review_ts" : str(datetime.datetime.now())
+        })
+        users.append(user_id)
+    users = []
+    for user in data["users"]:
+        users.append(user["id"])
+    log.info (f"User {user_input_url} added!")
+    log.info (f"New user list: {users}")
+            
     write_to_users_json(data)
+    
 
-    user_id = extract_user_id_from_url(user_input_url)
     if user_id == -1:
         await interaction.response.send_message("URL not supported!", ephemeral=True)
         return
-        
-    with open("data/users.txt", "a") as file:
-        if user_id not in users:
-            file.write(str(user_id)+ "\n")
-
-    with open("data/users.txt", "r") as file:
-        lines = file.readlines()
-        users = [int(line.strip()) for line in lines]
-        log.info(f"User {user_id} added!")
-        log.info(f"Current user list {users}")
-        reviews = rsh.get_rss_data(users)
 
 @tree.command(guild=discord.Object(id=GUILD_ID), name='remove', description='Remove User')  # guild specific
 async def remove_user(interaction: discord.Interaction, user_input_url: str):
@@ -153,28 +142,19 @@ async def remove_user(interaction: discord.Interaction, user_input_url: str):
     users = []
 
     await interaction.response.send_message("¡Eliminado!", ephemeral=True)
-
+    user_id = int(extract_user_id_from_url(user_input_url))
+    
     data = get_data_from_users_json()
 
     for i, user in enumerate(data["users"]):
-        if user["id"] == user_id_input:
+        if user["id"] == user_id:
             del data["users"][i]
-
-    user_id = int(extract_user_id_from_url(user_input_url))
+    write_to_users_json(data)
+    
     if user_id == -1:
         await interaction.response.send_message("URL not supported!", ephemeral=True)
-        return    
-    with open("data/users.txt", "r") as file:
-        lines = file.readlines()
-        old_users_list = [int(line.strip()) for line in lines]
-
-    with open("data/users.txt", "w") as file:
-        for user in old_users_list:
-            if user != user_id:
-                users.append(user)
-                file.write(str(user) + "\n")
-        log.info(f"User list after deletion: {users}")
-        reviews = rsh.get_rss_data(users)
+        return
+    
     
     log.info (f"User {user_input_url} removed!")
 
@@ -185,7 +165,7 @@ async def sync_bot(interaction: discord.Interaction):
     await interaction.response.send_message("Bot synced!", ephemeral=True)
     log.info (f"Bot synced!") 
 
-def extract_user_id_from_url(url):
+def extract_user_id_from_url(url) -> int:
     parsed_url = urlparse(url)
     if parsed_url.hostname == "goodreads.com" or "www.goodreads.com":
         if "/author/" in parsed_url.path:
@@ -193,7 +173,7 @@ def extract_user_id_from_url(url):
             return -1
         else:
             user_id = parsed_url.path.split('/')[-1].split('-')[0]
-            return user_id
+            return int(user_id)
     else:
         log.error(f"URL not supported!")
         return -1

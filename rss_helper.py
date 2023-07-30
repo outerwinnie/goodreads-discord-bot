@@ -6,11 +6,11 @@ import feedparser
 import logging
 import requests
 import datetime
+from rich.console import Console
 from rich.logging import RichHandler
 from bs4 import BeautifulSoup
 from configuration import LOGLEVEL
 
-logging.basicConfig(level=logging.INFO)
 USERS_JSON_FILE_PATH = "data/users.json"
 
 FORMAT = "%(message)s"
@@ -19,6 +19,7 @@ logging.basicConfig(level=LOGLEVEL,
                     datefmt="[%X]",
                     handlers=[RichHandler(markup=True, rich_tracebacks=True)])
 log = logging.getLogger("rich")
+console = Console()
 
 class Review(TypedDict):
     title: str
@@ -45,7 +46,7 @@ def get_user_image(user_id: int) -> str:
             log.debug(f"Not found {user_id} : {user_image_url}")
     return user_image_url
 
-def get_data_from_users_json(json_file_path=USERS_JSON_FILE_PATH):
+def get_data_from_users_json(json_file_path=USERS_JSON_FILE_PATH) -> dict:
     f = open(json_file_path, "r+")
     data = json.load(f)
     return data
@@ -103,7 +104,8 @@ class RSSHelper:
 
                             for i, user in enumerate(data["users"]):
                                 if user["id"] == user_id:
-                                    data["users"][i]["last_review_ts"] = date_converted.strptime("%a, %d %b %Y %H:%M:%S")
+                                    log.debug(f"User number: {i}")
+                                    data["users"][i]["last_review_ts"] = str(date_converted)
 
                             write_to_users_json(data)
 
@@ -147,7 +149,8 @@ class RSSHelper:
                             }
                             log.debug(f"Review found from: {username} for: {title}")
                     except Exception as error:
-                        log.debug(f"Bad entry: {entry}")
+                        console.print_exception()
+                        #log.debug(f"Bad entry: {entry}")
             except Exception as error:
                 # logging.error(traceback.format_exc())
                 log.warning(f"Couldn't connect to RSS https://www.goodreads.com/user/updates_rss/{user_id}")
