@@ -3,7 +3,7 @@
 
 ##  TO-DO
 - Arreglar el añadir y eliminar usuarios
-
+- Arreglar parser (Winnie no va)
 
 ##  MAYBE
 - Ajustar las fotos de perfil
