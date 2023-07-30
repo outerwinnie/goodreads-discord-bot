@@ -1,4 +1,5 @@
 import random
+import json
 import discord
 from discord.ext import commands, tasks
 import datetime
@@ -6,6 +7,7 @@ import logging
 import os
 from typing import List
 from rss_helper import RSSHelper, Review
+from rss_helper import get_data_from_users_json, write_to_users_json
 
 time = datetime.datetime.now
 logging.basicConfig(level=logging.INFO)
@@ -25,18 +27,21 @@ except:
     GUILD_ID = keys[1]
     CHANNEL_ID = int(keys[2])
 
+USERS_JSON_FILE_PATH = "data/users.json"
+
 logging.debug(f"Este es el ID del canal {CHANNEL_ID}")
 
 # Importing Users
-with open("data/users.txt", "r") as file:
-    users = [int(line) for line in file]
+
+f = open(USERS_JSON_FILE_PATH)
+data = json.load(f)
+users = [int(user['id']) for user in data["users"]]
 
 # Variables
 rsh = RSSHelper()
 reviews: List[Review] = rsh.get_rss_data(users)
 intents = discord.Intents.default()
 intents.message_content = True
-
 
 # Connecting with Discord
 class UpdatesClient(commands.Bot):
@@ -93,13 +98,16 @@ async def add_user(interaction: discord.Interaction, user_id_input: int):
     global users
     global reviews
 
-    with open("data/users.txt", "a") as file:
-        if user_id_input not in users:
-            file.writelines("\n" + str(user_id_input))
+    data = get_data_from_users_json()
+    users_id = [user["id"] for user in data["users"]]
+    for user_id in users_id:
+        if user_id not in users:
+            data["users"].append({
+                "id" : user_id,
+                "last_review_ts" : datetime.datetime.now()
+            })
 
-    with open("data/users.txt", "r") as file:
-        users = [int(line) for line in file]
-        reviews = rsh.get_rss_data(users)
+    write_to_users_json(data)
 
 
 @tree.command(guild=discord.Object(id=GUILD_ID), name='remove', description='Remove User')  # guild specific
@@ -109,17 +117,13 @@ async def remove_user(interaction: discord.Interaction, user_id_input: int):
     users = []
     await interaction.response.send_message("¡Eliminado!", ephemeral=True)
 
-    with open("data/users.txt", "r") as file:
-        old_users_list = [int(line) for line in file]
+    data = get_data_from_users_json()
 
-    with open("data/users.txt", "w") as file:
-        for user in old_users_list:
-            if user != user_id_input:
-                users.append(user)
-                file.write(str(user))
-        print(users)
-        reviews = rsh.get_rss_data(users)
+    for i, user in enumerate(data["users"]):
+        if user["id"] == user_id_input:
+            del data["users"][i]
 
+    write_to_users_json(data)
 
 # Update Reviews
 client.run(DISCORD_TOKEN)

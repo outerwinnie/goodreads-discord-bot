@@ -1,12 +1,16 @@
 import traceback
 from pprint import pprint
+import json
 from typing import TypedDict, List
 import feedparser
 import logging
 import requests
+import datetime
 from bs4 import BeautifulSoup
 
 logging.basicConfig(level=logging.INFO)
+USERS_JSON_FILE_PATH = "data/users.json"
+
 
 class Review(TypedDict):
     title: str
@@ -33,6 +37,18 @@ def get_user_image(user_id: int) -> str:
             logging.debug(f"Not found {user_id} : {user_image_url}")
     return user_image_url
 
+def get_data_from_users_json(json_file_path=USERS_JSON_FILE_PATH):
+    f = open(json_file_path, "r+")
+    data = json.load(f)
+    return data
+
+data = get_data_from_users_json()
+
+
+def write_to_users_json(new_json_data, json_file_path=USERS_JSON_FILE_PATH):
+    with open(json_file_path, 'w') as json_file:
+      json.dump(new_json_data, json_file, indent = 4, sort_keys=True)
+
 
 class RSSHelper:
 
@@ -47,6 +63,8 @@ class RSSHelper:
                 feedparser.USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0"
                 rss_feed = feedparser.parse(rss_feed_url, referrer="http://google.com")
                 logging.debug(f"Estado del parser {rss_feed.status}")
+
+
 
                 # Extract Username
                 index = rss_feed.feed.title.find("'s Updates")
@@ -70,6 +88,17 @@ class RSSHelper:
                         logging.debug(f"Hay estrella? Su posicion? {is_starred} {stars_position}")
                         if is_starred:
                             id += 1
+
+                            # Extract Timestamp
+                            date = datetime.datetime.strptime(entry.published, "%a, %d %b %Y %H:%M:%S %z")
+                            hours_time_zone = datetime.timedelta(hours=9)
+                            date_converted = date + hours_time_zone
+
+                            for i, user in enumerate(data["users"]):
+                                if user["id"] == user_id:
+                                    data["users"][i]["last_review_ts"] = date_converted.strptime("%a, %d %b %Y %H:%M:%S")
+
+                            write_to_users_json(data)
 
                             # Extract Title
                             title = second_href[second_href.find(">") + 1: second_href.find("</a>")]
@@ -122,10 +151,8 @@ class RSSHelper:
 # Dependant Variables
 rsh = RSSHelper()
 
-# Debug
+# ------------------- Debug ----------------------
 # info = rsh.get_rss_data([50670314, 35497141])
-user_id = 50670314
-rss_feed = feedparser.parse(rss_feed_url, referrer="http://google.com")
-rss_feed_url = f'https://www.goodreads.com/user/updates_rss/{user_id}'
-index = rss_feed.feed.title.find("'s Updates")
-print(index)
+# user_id = 35497141
+# rss_feed_url = f'https://www.goodreads.com/user/updates_rss/{user_id}'
+# rss_feed = feedparser.parse(rss_feed_url, referrer="http://google.com")
