@@ -6,6 +6,7 @@ import logging
 import os
 from urllib.parse import urlparse
 from rich.logging import RichHandler
+from rich import print
 from rich.traceback import install
 from typing import List
 from configuration import LOGLEVEL
@@ -43,7 +44,8 @@ log.info(f":books: Starting Discord Bot on ChannelID {CHANNEL_ID} :books:")
 
 # Importing Users
 with open("data/users.txt", "r") as file:
-    users = [int(line) for line in file]
+    lines = file.readlines()
+    users = [int(line.strip()) for line in lines]
 
 # Variables
 rsh = RSSHelper()
@@ -62,15 +64,17 @@ class UpdatesClient(commands.Bot):
 
     async def on_ready(self):
         channel = client.get_channel(CHANNEL_ID)  # replace with channel ID that you want to send to
-        await self.timer.start(channel)
         if not self.synced:  # check if slash commands have been synced
             await tree.sync(guild=discord.Object(
                 id=GUILD_ID))  # guild specific: leave blank if global (global registration can take 1-24 hours)
             self.synced = True
-            
+            log.info(f"Successfully logged and synced in as {client.user}")
+        await self.timer.start(channel)
+                   
     @tasks.loop(seconds=5)
     async def timer(self, channel):
         log.debug(":stopwatch: Starting timer :stopwatch:")
+        log.debug(f"Is sync?{self.synced}")
         # if time().minute == 0 or time().minute == 30:
         if random.randrange(0, 2) == 1:
             if not self.msg_sent:
@@ -93,11 +97,10 @@ class UpdatesClient(commands.Bot):
             self.msg_sent = False
 
 
-client = UpdatesClient(command_prefix='!', intents=discord.Intents().all())
+client = UpdatesClient(command_prefix='/', intents=discord.Intents().all())
 channel = client.get_channel(CHANNEL_ID)
 tree = client.tree
-
-    
+ 
 # Discord Slash Commands
 @tree.command(guild=discord.Object(id=GUILD_ID), name='add', description='Add User')  # guild specific
 async def add_user(interaction: discord.Interaction, user_input_url: str):
@@ -106,44 +109,65 @@ async def add_user(interaction: discord.Interaction, user_input_url: str):
     global reviews
 
     user_id = extract_user_id_from_url(user_input_url)
+    if user_id == -1:
+        await interaction.response.send_message("URL not supported!", ephemeral=True)
+        return
         
     with open("data/users.txt", "a") as file:
         if user_id not in users:
-            file.writelines("\n" + str(user_id))
+            file.write(str(user_id)+ "\n")
 
     with open("data/users.txt", "r") as file:
-        users = [int(line) for line in file]
+        lines = file.readlines()
+        users = [int(line.strip()) for line in lines]
+        log.info(f"User {user_id} added!")
+        log.info(f"Current user list {users}")
         reviews = rsh.get_rss_data(users)
 
-
 @tree.command(guild=discord.Object(id=GUILD_ID), name='remove', description='Remove User')  # guild specific
-async def remove_user(interaction: discord.Interaction, user_id_input: int):
+async def remove_user(interaction: discord.Interaction, user_input_url: str):
+    await interaction.response.send_message("¡Eliminado!", ephemeral=True)
     global reviews
     global users
     users = []
-    await interaction.response.send_message("¡Eliminado!", ephemeral=True)
-
+    user_id = int(extract_user_id_from_url(user_input_url))
+    if user_id == -1:
+        await interaction.response.send_message("URL not supported!", ephemeral=True)
+        return    
     with open("data/users.txt", "r") as file:
-        old_users_list = [int(line) for line in file]
+        lines = file.readlines()
+        old_users_list = [int(line.strip()) for line in lines]
 
     with open("data/users.txt", "w") as file:
         for user in old_users_list:
-            if user != user_id_input:
+            if user != user_id:
                 users.append(user)
-                file.write(str(user))
-        print(users)
+                file.write(str(user) + "\n")
+        log.info(f"User list after deletion: {users}")
         reviews = rsh.get_rss_data(users)
+    
+    log.info (f"User {user_input_url} removed!")
+
+@tree.command(guild=discord.Object(id=GUILD_ID), name='sync', description='Sync bot (dev)')  # guild specific
+async def sync_bot(interaction: discord.Interaction):
+    await tree.sync(guild=discord.Object(
+                id=GUILD_ID))
+    await interaction.response.send_message("Bot synced!", ephemeral=True)
+    log.info (f"Bot synced!") 
 
 def extract_user_id_from_url(url):
     parsed_url = urlparse(url)
-    path_parts = parsed_url.path.split('/')
-
-    for part in path_parts:
-        if '.' in part or '-' in part:
-            user_id = part.split('.')[0].split('-')[0]
+    if parsed_url.hostname == "goodreads.com" or "www.goodreads.com":
+        if "/author/" in parsed_url.path:
+            log.error(f"URL not supported!")
+            return -1
+        else:
+            user_id = parsed_url.path.split('/')[-1].split('-')[0]
             return user_id
-
-    return None  
+    else:
+        log.error(f"URL not supported!")
+        return -1
+  
 
 
 # Update Reviews
