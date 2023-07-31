@@ -102,9 +102,11 @@ class RSSHelper:
                         if is_starred:
                             log.debug("Review found!")
 
+
                             id += 1
 
                             # Check review is new
+                            data = get_data_from_users_json()
                             date = datetime.datetime.strptime(entry.published, DATE_FORMAT_INPUT)
                             review_date_timezoned = date.astimezone(pytz.timezone("Europe/Madrid"))
                             log.debug(f"Review Datetime: {str(review_date_timezoned)}")
