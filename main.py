@@ -11,7 +11,7 @@ from rich import print
 from rich.traceback import install
 from typing import List
 from configuration import LOGLEVEL
-from rss_helper import RSSHelper, Review
+from rss_helper import RSSHelper, Review, DATE_FORMAT_INPUT, DATE_FORMAT_OUTPUT
 from rss_helper import get_data_from_users_json, write_to_users_json
 
 FORMAT = "%(message)s"
@@ -77,8 +77,9 @@ class UpdatesClient(commands.Bot):
                    
     @tasks.loop(seconds=5)
     async def timer(self, channel):
+        global reviews
         log.debug(":stopwatch: Starting timer :stopwatch:")
-        log.debug(f"Is sync?{self.synced}")
+        log.debug(f"Is sync? {self.synced}")
         # if time().minute == 0 or time().minute == 30:
         if random.randrange(0, 2) == 1:
             if not self.msg_sent:
@@ -118,7 +119,7 @@ async def add_user(interaction: discord.Interaction, user_input_url: str):
     if user_id not in users_id:
         data["users"].append({
             "id" : user_id,
-            "last_review_ts" : str(datetime.datetime.now())
+            "last_review_ts" : datetime.datetime.now().strftime(DATE_FORMAT_OUTPUT)
         })
         users.append(user_id)
     users = []

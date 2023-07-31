@@ -10,8 +10,12 @@ from rich.console import Console
 from rich.logging import RichHandler
 from bs4 import BeautifulSoup
 from configuration import LOGLEVEL
+import pytz
+import sys
 
 USERS_JSON_FILE_PATH = "data/users.json"
+DATE_FORMAT_INPUT = "%a, %d %b %Y %H:%M:%S %z"
+DATE_FORMAT_OUTPUT = "%Y-%m-%d %H:%M:%S"
 
 FORMAT = "%(message)s"
 logging.basicConfig(level=LOGLEVEL,
@@ -68,6 +72,7 @@ class RSSHelper:
         for user_id in users:
             try:
                 rss_feed_url = f'https://www.goodreads.com/user/updates_rss/{user_id}'
+                log.debug(f"Trying for {user_id}")
 
                 feedparser.USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0"
                 rss_feed = feedparser.parse(rss_feed_url, referrer="http://google.com")
@@ -78,14 +83,14 @@ class RSSHelper:
                 # Extract Username
                 index = rss_feed.feed.title.find("'s Updates")
                 username = rss_feed.feed.title[:index].rstrip()
-                log.debug(f"Found user: {username}")
+                log.debug(f"Found user: {username}, {len(rss_feed.entries)} entries.")
                 # log.debug(f"{rss_feed.feed}")
 
                 # Get stars position
                 for i, entry in enumerate(rss_feed.entries):
                     try:
-                        # log.debug(f"Entry: {entry}")
-                        # log.debug(f"Entry description: {entry.description}")
+                        log.debug(f"Entry #{i}: {entry}")
+                        log.debug(f"Entry description: {entry.description}")
                         info = entry.description
                         second_href = info[info[info.find("href") + 1:].find("href"):]
                         star_position = info.find('star to <a class="bookTitle"')
@@ -95,19 +100,31 @@ class RSSHelper:
                         # Only reviews with Stars
                         # log.debug(f"Star found? {is_starred} Position? {stars_position}")
                         if is_starred:
+                            log.debug("Review found!")
+
                             id += 1
 
-                            # Extract Timestamp
-                            date = datetime.datetime.strptime(entry.published, "%a, %d %b %Y %H:%M:%S %z")
-                            hours_time_zone = datetime.timedelta(hours=9)
-                            date_converted = date + hours_time_zone
-
+                            # Check review is new
+                            date = datetime.datetime.strptime(entry.published, DATE_FORMAT_INPUT)
+                            review_date_timezoned = date.astimezone(pytz.timezone("Europe/Madrid"))
+                            log.debug(f"Review Datetime: {str(review_date_timezoned)}")
+                            log.debug(f"Review timestamp: {review_date_timezoned.timestamp()}")
                             for i, user in enumerate(data["users"]):
+                                log.debug(f'User Review Datetime: {data["users"][i]["last_review_ts"]}')
+                                log.debug(f'User Review timestamp: {datetime.datetime.strptime(data["users"][i]["last_review_ts"], DATE_FORMAT_OUTPUT).timestamp()}')
+
                                 if user["id"] == user_id:
                                     log.debug(f"User number: {i}")
-                                    data["users"][i]["last_review_ts"] = str(date_converted)
+                                    if datetime.datetime.strptime(data["users"][i]["last_review_ts"], DATE_FORMAT_OUTPUT).timestamp() < review_date_timezoned.timestamp():
+                                        log.debug("New Review!")
+                                        data["users"][i]["last_review_ts"] = review_date_timezoned.strftime(DATE_FORMAT_OUTPUT)
+                                        write_to_users_json(data)
+                                    else:
+                                        log.debug("Old review, not sending.")
+                                        raise Exception("Review is old.")
 
-                            write_to_users_json(data)
+
+
 
                             # Extract Title
                             title = second_href[second_href.find(">") + 1: second_href.find("</a>")]
