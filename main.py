@@ -80,8 +80,8 @@ class UpdatesClient(commands.Bot):
         global reviews
         log.debug(":stopwatch: Starting timer :stopwatch:")
         log.debug(f"Is sync? {self.synced}")
-        # if time().minute == 0 or time().minute == 30:
-        if random.randrange(0, 2) == 1:
+        if time().minute == 0 or time().minute == 30:
+        # if random.randrange(0, 2) == 1: # Uncomment to test
             if not self.msg_sent:
                 i: int
                 for i in reviews:
@@ -98,6 +98,8 @@ class UpdatesClient(commands.Bot):
                     log.debug(f"Review sent for user: {reviews[i]['username']}")
                     await channel.send(embed=embed, mention_author=True)
                 self.msg_sent = True
+                reviews = {}
+                reviews = rsh.get_rss_data(users)
         else:
             self.msg_sent = False
 
