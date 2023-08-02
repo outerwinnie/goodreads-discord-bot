@@ -12,7 +12,7 @@ docker-compose.yml:
 version: "2.1"
 services:
   goodreads-discord-bot:
-    image: 	goodreads-discord-bot:latest	
+    image: goodreads-discord-bot:latest	
     container_name: goodreads-discord-bot
     environment:
       - TZ=Europe/Madrid
