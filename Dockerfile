@@ -2,6 +2,7 @@ FROM python:3.11
 
 ADD main.py .
 ADD rss_helper.py .
+ADD configuration.py .
 COPY data /data/
 
 RUN pip install -U discord.py

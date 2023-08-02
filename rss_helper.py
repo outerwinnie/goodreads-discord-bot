@@ -25,6 +25,7 @@ logging.basicConfig(level=LOGLEVEL,
 log = logging.getLogger("rich")
 console = Console()
 
+
 class Review(TypedDict):
     title: str
     score: int
@@ -50,17 +51,19 @@ def get_user_image(user_id: int) -> str:
             log.debug(f"Not found {user_id} : {user_image_url}")
     return user_image_url
 
+
 def get_data_from_users_json(json_file_path=USERS_JSON_FILE_PATH) -> dict:
     f = open(json_file_path, "r+")
     data = json.load(f)
     return data
+
 
 data = get_data_from_users_json()
 
 
 def write_to_users_json(new_json_data, json_file_path=USERS_JSON_FILE_PATH):
     with open(json_file_path, 'w') as json_file:
-      json.dump(new_json_data, json_file, indent = 4, sort_keys=True)
+        json.dump(new_json_data, json_file, indent=4, sort_keys=True)
 
 
 class RSSHelper:
@@ -77,8 +80,6 @@ class RSSHelper:
                 feedparser.USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0"
                 rss_feed = feedparser.parse(rss_feed_url, referrer="http://google.com")
                 log.debug(f"Parser HTML status: {rss_feed.status}")
-
-
 
                 # Extract Username
                 index = rss_feed.feed.title.find("'s Updates")
@@ -102,7 +103,6 @@ class RSSHelper:
                         if is_starred:
                             log.debug("Review found!")
 
-
                             id += 1
 
                             # Check review is new
@@ -113,20 +113,20 @@ class RSSHelper:
                             log.debug(f"Review timestamp: {review_date_timezoned.timestamp()}")
                             for i, user in enumerate(data["users"]):
                                 log.debug(f'User Review Datetime: {data["users"][i]["last_review_ts"]}')
-                                log.debug(f'User Review timestamp: {datetime.datetime.strptime(data["users"][i]["last_review_ts"], DATE_FORMAT_OUTPUT).timestamp()}')
+                                log.debug(
+                                    f'User Review timestamp: {datetime.datetime.strptime(data["users"][i]["last_review_ts"], DATE_FORMAT_OUTPUT).timestamp()}')
 
                                 if user["id"] == user_id:
                                     log.debug(f"User number: {i}")
-                                    if datetime.datetime.strptime(data["users"][i]["last_review_ts"], DATE_FORMAT_OUTPUT).timestamp() < review_date_timezoned.timestamp():
+                                    if datetime.datetime.strptime(data["users"][i]["last_review_ts"],
+                                                                  DATE_FORMAT_OUTPUT).timestamp() < review_date_timezoned.timestamp():
                                         log.debug("New Review!")
-                                        data["users"][i]["last_review_ts"] = review_date_timezoned.strftime(DATE_FORMAT_OUTPUT)
+                                        data["users"][i]["last_review_ts"] = review_date_timezoned.strftime(
+                                            DATE_FORMAT_OUTPUT)
                                         write_to_users_json(data)
                                     else:
                                         log.debug("Old review, not sending.")
                                         raise Exception("Review is old.")
-
-
-
 
                             # Extract Title
                             title = second_href[second_href.find(">") + 1: second_href.find("</a>")]
@@ -169,7 +169,7 @@ class RSSHelper:
                             log.debug(f"Review found from: {username} for: {title}")
                     except Exception as error:
                         console.print_exception()
-                        #log.debug(f"Bad entry: {entry}")
+                        # log.debug(f"Bad entry: {entry}")
             except Exception as error:
                 # logging.error(traceback.format_exc())
                 log.warning(f"Couldn't connect to RSS https://www.goodreads.com/user/updates_rss/{user_id}")
