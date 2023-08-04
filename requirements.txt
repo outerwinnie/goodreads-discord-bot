@@ -1,0 +1,7 @@
+discord
+rich
+feedparser
+beautifulsoup4
+requests
+pytz
+python-dotenv

@@ -1,5 +1,6 @@
 import random
 import json
+from json import JSONDecodeError
 import discord
 from discord.ext import commands, tasks
 import datetime
@@ -10,7 +11,8 @@ from rich.logging import RichHandler
 from rich import print
 from rich.traceback import install
 from typing import List
-from configuration import LOGLEVEL
+import configuration
+from configuration import LOGLEVEL, USERS_JSON_FILE_PATH
 from rss_helper import RSSHelper, Review, DATE_FORMAT_INPUT, DATE_FORMAT_OUTPUT
 from rss_helper import get_data_from_users_json, write_to_users_json
 
@@ -26,31 +28,38 @@ if logging.root.level == logging.DEBUG:
     install(show_locals=True)
 else:
     install(show_locals=False)
-    
-time = datetime.datetime.now
+
+def init_file_structure (users_json_path: str):
+    if not os.path.exists(users_json_path):
+        with open(users_json_path, "w") as f:
+            log.info("Json file doesn't exists, creating...")
+            pass # Creates empty file if none exist
+        
+init_file_structure(USERS_JSON_FILE_PATH)
 
 # Importing keys
-with open("data/config.txt", "r") as file:
-    keys = [line for line in file]
-
 try:
     DISCORD_TOKEN = os.environ['DISCORD_TOKEN']
     GUILD_ID = os.environ['GUILD_ID']
     CHANNEL_ID = int(os.environ['CHANNEL_ID'])
 except:
-    DISCORD_TOKEN = keys[0]
-    GUILD_ID = keys[1]
-    CHANNEL_ID = int(keys[2])
+    DISCORD_TOKEN = configuration.DISCORD_TOKEN
+    GUILD_ID = configuration.GUILD_ID
+    CHANNEL_ID = configuration.CHANNEL_ID
 
-USERS_JSON_FILE_PATH = "data/users.json"
-
-logging.debug(f"Este es el ID del canal {CHANNEL_ID}")
+logging.debug(f"Channel ID: {CHANNEL_ID}")
 
 # Importing Users
-f = open(USERS_JSON_FILE_PATH)
-data = json.load(f)
-users = [int(user['id']) for user in data["users"]]
-log.info(f":books: Starting Discord Bot on ChannelID {CHANNEL_ID} :books:")
+try:    
+    f = open(USERS_JSON_FILE_PATH)
+    data = json.load(f)
+    users = [int(user['id']) for user in data["users"]]
+    log.info(f":books: Starting Discord Bot on ChannelID {CHANNEL_ID} :books:")
+except JSONDecodeError:
+    users: List[int] = []
+    log.warning("Json file is empty")
+    log.info(f":books: Starting Discord Bot on ChannelID {CHANNEL_ID} :books:")
+    
 
 # Variables
 rsh = RSSHelper()
@@ -80,8 +89,9 @@ class UpdatesClient(commands.Bot):
         global reviews
         log.debug(":stopwatch: Starting timer :stopwatch:")
         log.debug(f"Is sync? {self.synced}")
-        if time().minute == 0 or time().minute == 30:
-        # if random.randrange(0, 2) == 1: # Uncomment to test
+        current_time = datetime.datetime.now()
+        if current_time.minute == 0 or current_time.minute == 30:
+        #if random.randrange(0, 2) == 1: # Uncomment to test
             if not self.msg_sent:
                 i: int
                 for i in reviews:
@@ -114,17 +124,25 @@ async def add_user(interaction: discord.Interaction, user_input_url: str):
     await interaction.response.send_message("¡Añadido!", ephemeral=True)
     global users
     global reviews
+    users_id: List[int] = []
     user_id = extract_user_id_from_url(user_input_url)
     
     data = get_data_from_users_json()
-    users_id = [user["id"] for user in data["users"]]
-    if user_id not in users_id:
-        data["users"].append({
-            "id" : user_id,
-            "last_review_ts" : datetime.datetime.now().strftime(DATE_FORMAT_OUTPUT)
-        })
-        users.append(user_id)
-    users = []
+    if data:
+        users_id = [user["id"] for user in data["users"]]
+        if user_id not in users_id:
+            data["users"].append({
+                "id" : user_id,
+                "last_review_ts" : datetime.datetime.now().strftime(DATE_FORMAT_OUTPUT)
+            })
+    else: # For first user
+       data.setdefault("users",[])
+       data["users"].append({
+                "id" : user_id,
+                "last_review_ts" : datetime.datetime.now().strftime(DATE_FORMAT_OUTPUT)
+            })
+       
+    users = []        
     for user in data["users"]:
         users.append(user["id"])
     log.info (f"User {user_input_url} added!")
@@ -144,7 +162,6 @@ async def remove_user(interaction: discord.Interaction, user_input_url: str):
     global users
     users = []
 
-    await interaction.response.send_message("¡Eliminado!", ephemeral=True)
     user_id = int(extract_user_id_from_url(user_input_url))
     
     data = get_data_from_users_json()
@@ -183,6 +200,7 @@ def extract_user_id_from_url(url) -> int:
   
 
     write_to_users_json(data)
+
 
 # Update Reviews
 client.run(DISCORD_TOKEN)

@@ -1,6 +1,7 @@
 import traceback
 from pprint import pprint
 import json
+from json import JSONDecodeError
 from typing import TypedDict, List
 import feedparser
 import logging
@@ -9,9 +10,9 @@ import datetime
 from rich.console import Console
 from rich.logging import RichHandler
 from bs4 import BeautifulSoup
-from configuration import LOGLEVEL
+from configuration import LOGLEVEL, DATA_FOLDER, USERS_JSON_FILE_PATH
 import pytz
-import sys
+import os
 
 USERS_JSON_FILE_PATH = "data/users.json"
 DATE_FORMAT_INPUT = "%a, %d %b %Y %H:%M:%S %z"
@@ -53,18 +54,21 @@ def get_user_image(user_id: int) -> str:
 
 
 def get_data_from_users_json(json_file_path=USERS_JSON_FILE_PATH) -> dict:
-    f = open(json_file_path, "r+")
-    data = json.load(f)
-    return data
+    try:        
+        f = open(json_file_path, "r+")
+        data = json.load(f)
+        return data
+    except JSONDecodeError:
+        log.info("No users in json file")
+        return {}
 
 
-data = get_data_from_users_json()
+# data = get_data_from_users_json()
 
 
 def write_to_users_json(new_json_data, json_file_path=USERS_JSON_FILE_PATH):
     with open(json_file_path, 'w') as json_file:
         json.dump(new_json_data, json_file, indent=4, sort_keys=True)
-
 
 class RSSHelper:
 
@@ -126,7 +130,6 @@ class RSSHelper:
                                         write_to_users_json(data)
                                     else:
                                         log.debug("Old review, not sending.")
-                                        raise Exception("Review is old.")
 
                             # Extract Title
                             title = second_href[second_href.find(">") + 1: second_href.find("</a>")]
