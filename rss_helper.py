@@ -2,7 +2,7 @@ import traceback
 from pprint import pprint
 import json
 from json import JSONDecodeError
-from typing import TypedDict, List
+from typing import List
 import feedparser
 import logging
 import requests
@@ -10,9 +10,10 @@ import datetime
 from rich.console import Console
 from rich.logging import RichHandler
 from bs4 import BeautifulSoup
-from configuration import LOGLEVEL, DATA_FOLDER, USERS_JSON_FILE_PATH
+from configuration import LOGLEVEL, DATA_FOLDER, USERS_JSON_FILE_PATH, GOODREADS_SERVICE
 import pytz
-import os
+from classes import Review, BookUser
+import bookwyrm
 
 USERS_JSON_FILE_PATH = "data/users.json"
 DATE_FORMAT_INPUT = "%a, %d %b %Y %H:%M:%S %z"
@@ -27,18 +28,7 @@ log = logging.getLogger("rich")
 console = Console()
 
 
-class Review(TypedDict):
-    title: str
-    score: int
-    author: str
-    url: str
-    image_url: str
-    user_url: str
-    username: str
-    user_image_url: str
-
-
-def get_user_image(user_id: int) -> str:
+def get_user_image(user_id: str) -> str:
     user_url = f"https://www.goodreads.com/user/show/{user_id}"  # f-string
     page = requests.get(user_url)
     soup = BeautifulSoup(page.content, "html.parser")
@@ -73,13 +63,16 @@ def write_to_users_json(new_json_data, json_file_path=USERS_JSON_FILE_PATH):
 class RSSHelper:
 
     # Get RSS description
-    def get_rss_data(self, users: List) -> List[Review]:
-        reviews = {}
+    def get_rss_data_goodreads(self, users: List[BookUser]) -> List[Review]:
+        reviews = []
         id = 0
-        for user_id in users:
+        #user_list: List[BookUser] = [user for user in users]
+        for user in users:
+            if user["service"] != GOODREADS_SERVICE:
+                continue
             try:
-                rss_feed_url = f'https://www.goodreads.com/user/updates_rss/{user_id}'
-                log.debug(f"Trying for {user_id}")
+                rss_feed_url = f'https://www.goodreads.com/user/updates_rss/{user["id"]}'
+                log.debug(f"Trying for {user['user_url']}")
 
                 feedparser.USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0"
                 rss_feed = feedparser.parse(rss_feed_url, referrer="http://google.com")
@@ -115,12 +108,12 @@ class RSSHelper:
                             review_date_timezoned = date.astimezone(pytz.timezone("Europe/Madrid"))
                             log.debug(f"Review Datetime: {str(review_date_timezoned)}")
                             log.debug(f"Review timestamp: {review_date_timezoned.timestamp()}")
-                            for i, user in enumerate(data["users"]):
+                            for i, user_ in enumerate(data["users"]):
                                 log.debug(f'User Review Datetime: {data["users"][i]["last_review_ts"]}')
                                 log.debug(
                                     f'User Review timestamp: {datetime.datetime.strptime(data["users"][i]["last_review_ts"], DATE_FORMAT_OUTPUT).timestamp()}')
 
-                                if user["id"] == user_id:
+                                if user_["id"] == user["id"]:
                                     log.debug(f"User number: {i}")
                                     if datetime.datetime.strptime(data["users"][i]["last_review_ts"],
                                                                   DATE_FORMAT_OUTPUT).timestamp() < review_date_timezoned.timestamp():
@@ -151,40 +144,46 @@ class RSSHelper:
                             # Extract URL
                             url = info[9: info.find('">')]
 
-                            # Extract User URL
-                            user_url = rss_feed_url.replace("updates_rss", "show")
-
                             try:
-                                user_image_url = get_user_image(user_id)
+                                user_image_url = get_user_image(user["id"])
                             except:
                                 user_image_url = "https://i.imgur.com/9pNffkj.png"
 
-                            reviews[id]: Review = {
+                            reviews.append( {
                                 "title": title,
                                 "score": int(score),
                                 "author": author,
                                 "url": url,
                                 "image_url": image_url,
-                                "user_url": user_url,
+                                "user_url": user["user_url"],
                                 "username": username,
                                 "user_image_url": user_image_url
-                            }
+                            })
                             log.debug(f"Review found from: {username} for: {title}")
                     except Exception as error:
                         console.print_exception()
                         # log.debug(f"Bad entry: {entry}")
             except Exception as error:
                 # logging.error(traceback.format_exc())
-                log.warning(f"Couldn't connect to RSS https://www.goodreads.com/user/updates_rss/{user_id}")
+                log.warning(f"Couldn't connect to RSS https://www.goodreads.com/user/updates_rss/{user['id']}")
+                #return []
 
         return reviews
 
-
+    def get_bookwyrm_data (self, users: List[BookUser]) -> List[Review]:
+        bookwyrm_reviews = bookwyrm.get_users_reviews(users)
+        return bookwyrm_reviews
+    
+    def get_reviews(self, users: List[BookUser]) -> List[Review]:
+        goodreads_reviews = self.get_rss_data_goodreads(users)
+        bookwyrm_reviews = self.get_bookwyrm_data(users)
+        return goodreads_reviews + bookwyrm_reviews
+            
 # Dependant Variables
 rsh = RSSHelper()
 
 # ------------------- Debug ----------------------
-# info = rsh.get_rss_data([50670314, 35497141])
+# info = rsh.get_rss_data_goodreads([50670314, 35497141])
 # user_id = 35497141
 # rss_feed_url = f'https://www.goodreads.com/user/updates_rss/{user_id}'
 # rss_feed = feedparser.parse(rss_feed_url, referrer="http://google.com")

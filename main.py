@@ -12,8 +12,10 @@ from rich import print
 from rich.traceback import install
 from typing import List
 import configuration
-from configuration import LOGLEVEL, USERS_JSON_FILE_PATH
-from rss_helper import RSSHelper, Review, DATE_FORMAT_INPUT, DATE_FORMAT_OUTPUT
+from configuration import LOGLEVEL, USERS_JSON_FILE_PATH, GOODREADS_SERVICE, BOOKWYRM_SERVICE
+from classes import Review, BookUser
+from rss_helper import RSSHelper
+from rss_helper import DATE_FORMAT_INPUT, DATE_FORMAT_OUTPUT
 from rss_helper import get_data_from_users_json, write_to_users_json
 
 FORMAT = "%(message)s"
@@ -53,17 +55,17 @@ logging.debug(f"Channel ID: {CHANNEL_ID}")
 try:    
     f = open(USERS_JSON_FILE_PATH)
     data = json.load(f)
-    users = [int(user['id']) for user in data["users"]]
+    users: List[BookUser] = [user for user in data["users"]]
     log.info(f":books: Starting Discord Bot on ChannelID {CHANNEL_ID} :books:")
 except JSONDecodeError:
-    users: List[int] = []
+    users: List[BookUser] = []
     log.warning("Json file is empty")
     log.info(f":books: Starting Discord Bot on ChannelID {CHANNEL_ID} :books:")
     
 
 # Variables
 rsh = RSSHelper()
-reviews: List[Review] = rsh.get_rss_data(users)
+reviews: List[Review] = rsh.get_reviews(users)
 intents = discord.Intents.default()
 intents.message_content = True
 
@@ -87,29 +89,30 @@ class UpdatesClient(commands.Bot):
     @tasks.loop(seconds=5)
     async def timer(self, channel):
         global reviews
-        log.debug(":stopwatch: Starting timer :stopwatch:")
+        rand_debug = random.randrange(0,5)
+        log.debug(f":stopwatch: Starting timer... Random:{rand_debug} :stopwatch:")
         log.debug(f"Is sync? {self.synced}")
         current_time = datetime.datetime.now()
-        if current_time.minute == 0 or current_time.minute == 30:
-        #if random.randrange(0, 2) == 1: # Uncomment to test
+        #if current_time.minute == 2 or current_time.minute == 4:
+        if rand_debug == 1: # Uncomment to test
             if not self.msg_sent:
                 i: int
-                for i in reviews:
+                for review in reviews:
                     score_star = ''
-                    for x in range(reviews[i]['score']):
+                    for x in range(review['score']):
                         score_star += '★'
 
-                    embed = discord.Embed(title=reviews[i]['title'] + ' ' + score_star,
-                                          description=reviews[i]['author'],
-                                          url=reviews[i]['url'])
-                    embed.set_author(name=reviews[i]['username'],
-                                     url=reviews[i]["user_url"], icon_url=reviews[i]["user_image_url"])
-                    embed.set_thumbnail(url=reviews[i]['image_url'])
-                    log.debug(f"Review sent for user: {reviews[i]['username']}")
+                    embed = discord.Embed(title=review['title'] + ' ' + score_star,
+                                          description=review['author'],
+                                          url=review['url'])
+                    embed.set_author(name=review['username'],
+                                     url=review["user_url"], icon_url=review["user_image_url"])
+                    embed.set_thumbnail(url=review['image_url'])
+                    log.debug(f"Review sent for user: {review['username']}")
                     await channel.send(embed=embed, mention_author=True)
                 self.msg_sent = True
-                reviews = {}
-                reviews = rsh.get_rss_data(users)
+                reviews = []
+                reviews = rsh.get_reviews(users)
         else:
             self.msg_sent = False
 
@@ -119,64 +122,70 @@ channel = client.get_channel(CHANNEL_ID)
 tree = client.tree
  
 # Discord Slash Commands
-@tree.command(guild=discord.Object(id=GUILD_ID), name='add', description='Add User')  # guild specific
+@tree.command(guild=discord.Object(id=GUILD_ID), name='add', description='Add BookUser')  # guild specific
 async def add_user(interaction: discord.Interaction, user_input_url: str):
     await interaction.response.send_message("¡Añadido!", ephemeral=True)
     global users
     global reviews
-    users_id: List[int] = []
-    user_id = extract_user_id_from_url(user_input_url)
+    users_id: List[str] = []
+    extracted_user = extract_user_from_url(user_input_url)
     
     data = get_data_from_users_json()
+    current_user: BookUser = {
+                "service" : extracted_user["service"],
+                "id" : extracted_user["id"],
+                "user_url" : extracted_user["user_url"],
+                "last_review_ts" : datetime.datetime.now().strftime(DATE_FORMAT_OUTPUT)
+                }
     if data:
         users_id = [user["id"] for user in data["users"]]
-        if user_id not in users_id:
-            data["users"].append({
-                "id" : user_id,
-                "last_review_ts" : datetime.datetime.now().strftime(DATE_FORMAT_OUTPUT)
-            })
+        if extracted_user["id"] not in users_id:
+            
+            data["users"].append(current_user)
+            users.append(current_user)
+            
     else: # For first user
        data.setdefault("users",[])
-       data["users"].append({
-                "id" : user_id,
-                "last_review_ts" : datetime.datetime.now().strftime(DATE_FORMAT_OUTPUT)
-            })
-       
-    users = []        
-    for user in data["users"]:
-        users.append(user["id"])
-    log.info (f"User {user_input_url} added!")
+       data["users"].append(current_user)
+
+       users.append(current_user)
+    
+    write_to_users_json(data)
+    reviews = rsh.get_reviews(users) # Need to fix to just 
+                                # update reviews with this user reviews
+    
+    log.info (f"BookUser {user_input_url} added!")
     log.info (f"New user list: {users}")
             
-    write_to_users_json(data)
+    
     
 
-    if user_id == -1:
+    if not extracted_user:
         await interaction.response.send_message("URL not supported!", ephemeral=True)
         return
 
-@tree.command(guild=discord.Object(id=GUILD_ID), name='remove', description='Remove User')  # guild specific
+@tree.command(guild=discord.Object(id=GUILD_ID), name='remove', description='Remove BookUser')  # guild specific
 async def remove_user(interaction: discord.Interaction, user_input_url: str):
     await interaction.response.send_message("¡Eliminado!", ephemeral=True)
     global reviews
     global users
-    users = []
 
-    user_id = int(extract_user_id_from_url(user_input_url))
+    extracted_user = extract_user_from_url(user_input_url)
     
     data = get_data_from_users_json()
 
     for i, user in enumerate(data["users"]):
-        if user["id"] == user_id:
+        if user["id"] == extracted_user["id"] and user["service"] == extracted_user["service"]:
             del data["users"][i]
     write_to_users_json(data)
+    users = data["users"]
     
-    if user_id == -1:
+    if not extracted_user:
         await interaction.response.send_message("URL not supported!", ephemeral=True)
         return
     
     
-    log.info (f"User {user_input_url} removed!")
+    log.info (f"BookUser {user_input_url} removed!")
 
 @tree.command(guild=discord.Object(id=GUILD_ID), name='sync', description='Sync bot (dev)')  # guild specific
 async def sync_bot(interaction: discord.Interaction):
@@ -185,18 +194,37 @@ async def sync_bot(interaction: discord.Interaction):
     await interaction.response.send_message("Bot synced!", ephemeral=True)
     log.info (f"Bot synced!") 
 
-def extract_user_id_from_url(url) -> int:
+def extract_user_from_url(url) -> dict:
     parsed_url = urlparse(url)
-    if parsed_url.hostname == "goodreads.com" or "www.goodreads.com":
+    if parsed_url.hostname == "goodreads.com" or parsed_url.hostname == "www.goodreads.com":
         if "/author/" in parsed_url.path:
             log.error(f"URL not supported!")
-            return -1
+            return {}
         else:
             user_id = parsed_url.path.split('/')[-1].split('-')[0]
-            return int(user_id)
+            user = {
+                "service": GOODREADS_SERVICE,
+                "id": user_id,
+                "user_url" : f"{parsed_url.scheme}://{parsed_url.hostname}{parsed_url.path}"
+            }
+            return user
+        
+    if parsed_url.hostname == "bookwyrm.social" or parsed_url.hostname == "www.bookwyrm.social":
+        if "/author/" in parsed_url.path:
+            log.error(f"URL not supported!")
+            return {}
+        else:
+            user_id = parsed_url.path.split('/')[-1]
+            user = {
+                "service": BOOKWYRM_SERVICE,
+                "id" : user_id,
+                "user_url" : f"{parsed_url.scheme}://{parsed_url.hostname}{parsed_url.path}"
+            }
+            log.debug(f"BookUser {user_id} found for Bookwyrm")
+            return user  
     else:
         log.error(f"URL not supported!")
-        return -1
+        return {}
   
 
     write_to_users_json(data)
