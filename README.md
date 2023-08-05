@@ -16,9 +16,7 @@ services:
     container_name: goodreads-discord-bot
     environment:
       - TZ=Europe/Madrid
-      - DISCORD_TOKEN=
-      - GUILD_ID=
-      - CHANNEL_ID=
+      - DISCORD_TOKEN_ENV=
     mem_limit: 50m
     cpus: 0.1
     restart: unless-stoppe
