@@ -12,8 +12,8 @@ import re
 import requests
 from urllib.parse import urlparse, urljoin
 
-from configuration import LOGLEVEL
-from rss_helper import Review
+from configuration import LOGLEVEL, BOOKWYRM_SERVICE
+from classes import Review, BookUser
 
 if logging.root.level == logging.DEBUG:
     install(show_locals=True)
@@ -28,8 +28,8 @@ logging.basicConfig(level=LOGLEVEL,
                     handlers=[RichHandler(markup=True, rich_tracebacks=True)])
 log = logging.getLogger("rich")
 
-rss_url = "https://bookwyrm.social/user/potajito/rss-reviews"
-user_profile_url = "https://bookwyrm.social/user/potajito"
+#rss_url = "https://bookwyrm.social/user/potajito/rss-reviews"
+#user_profile_url = "https://bookwyrm.social/user/potajito"
 
 def parse_book_name (s: str) -> str:
     """Extracts book name from a string, searching for the text between double quotes ("text")
@@ -121,12 +121,12 @@ def fill_review (title: str, score: int, author: str,
     # log.debug(f"Added review: {current_review}")
     return current_review 
    
-def parse_user_profile (profile_url: str) -> dict:
+def parse_user_profile (profile_url: str) -> List[Review]:
     reviews: List[Review] = []
     try:
         profile_url_domain = urlparse(profile_url).hostname
         profile_url_scheme = urlparse(profile_url).scheme
-        reviews_url = append_to_url(user_profile_url,'/reviews-comments')
+        reviews_url = append_to_url(profile_url,'/reviews-comments')
         soup = BeautifulSoup(requests.get(reviews_url).text,"html.parser")
         
         user_image_url = soup.find('img', class_=re.compile(r'avatar image*')).get('src')
@@ -189,14 +189,25 @@ def parse_user_profile (profile_url: str) -> dict:
                 clean_string = f"{username} reviewed {book_name} by {author}: {score}"
                 log.info(clean_string)
         log.info(f"Found {len(reviews)} reviews")
-        log.debug(pprint(reviews))
+        #log.debug(pprint(reviews))
         return reviews
     
                         
     except Exception as error:
         print('Could not parse:', reviews_url)
         console.print_exception()
+        return []
 
-parse_user_profile(user_profile_url)
+def get_users_reviews (users: List[BookUser]) -> List[Review]:
+    reviews: List[Review] = [] 
+    for user in users:
+        if user['service'] == BOOKWYRM_SERVICE:
+            user_reviews = parse_user_profile(user['user_url'])
+            reviews = reviews + user_reviews
+    log.debug(pprint(reviews))
+    return reviews
+
+
+#get_users_reviews(user_profile_url)
 # parse_rss(rss_url)
     
