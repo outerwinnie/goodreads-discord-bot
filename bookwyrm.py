@@ -8,11 +8,15 @@ from rich.pretty import pprint
 from rich.traceback import install
 from rich.console import Console
 from bs4 import BeautifulSoup, NavigableString
-import re
+import re, pytz
 import requests
 from urllib.parse import urlparse, urljoin
+from datetime import datetime, timedelta
+from dateutil import parser, relativedelta
+
 
 from configuration import LOGLEVEL, BOOKWYRM_SERVICE
+from configuration import TIME_ZONE, DATE_FORMAT_INPUT, DATE_FORMAT_OUTPUT
 from classes import Review, BookUser
 
 if logging.root.level == logging.DEBUG:
@@ -100,14 +104,28 @@ def find_book_author(entry: NavigableString) -> str:
     except Exception:
         return 'Unknown author'
 
+def find_time_elapsed(entry: NavigableString) -> str:
+    try:
+        href_pattern = re.compile(r'https://bookwyrm\.social/user/.+')
+        tag: NavigableString = entry.find('a', href=href_pattern)
+        if tag:
+            time_elapsed_str = tag.get_text().strip()
+            if time_elapsed_str:
+                return time_elapsed_str
+        else:
+            return 'Unknown time'        
+    except Exception:
+        return 'Unknown time'
+
+
 def fill_review (title: str, score: int, author: str,
                 url: str, image_url: str, user_url: str,
-                username: str, user_image_url: str) -> Review:
+                username: str, user_image_url: str, review_time_stamp: str) -> Review:
     """Adds fields to Review class
 
     Args:
         review (Review): _description_
-    """
+    """ 
     current_review = {
             "title": title,
             "score": score,
@@ -116,7 +134,8 @@ def fill_review (title: str, score: int, author: str,
             "image_url": image_url,
             "user_url": user_url,
             "username": username,
-            "user_image_url": user_image_url
+            "user_image_url": user_image_url,
+            "review_time_stamp": review_time_stamp
             }
     # log.debug(f"Added review: {current_review}")
     return current_review 
@@ -131,13 +150,15 @@ def parse_user_profile (profile_url: str) -> List[Review]:
         
         user_image_url = soup.find('img', class_=re.compile(r'avatar image*')).get('src')
          
-        header_entries: List[NavigableString] = soup.find_all('h3', class_='has-text-weight-bold')
+        header_entries: List[NavigableString] = soup.find_all('div', class_='media-content')
         #box_entries = soup.find_all('section', class_='card-content')
 
         for entry in header_entries:
             if ' rated ' in entry.text:
                 username = entry.find('span', itemprop='name').text.strip()
                 book_name = find_book_title(entry)
+                time_elapsed_str = find_time_elapsed(entry)
+                review_time_stamp = convert_elapsed_to_timestamp(time_elapsed_str)
                 score_in_stars = entry.select_one('.stars .is-sr-only').text.strip()
                 score = int(re.findall(r'\d+', score_in_stars)[0])
 
@@ -158,12 +179,14 @@ def parse_user_profile (profile_url: str) -> List[Review]:
                         break
                 reviews.append(fill_review(book_name, score, author,
                                            book_url, image_url, profile_url,
-                                           username, user_image_url))
+                                           username, user_image_url, review_time_stamp))
                 clean_string = f"{username} rated {book_name} by {author}: {score}"
                 log.info(clean_string)
             if ' reviewed ' in entry.text:
                 username = entry.find('span', itemprop='name').text.strip()
                 book_name = find_book_title(entry)
+                time_elapsed_str = find_time_elapsed(entry)
+                review_time_stamp = convert_elapsed_to_timestamp(time_elapsed_str)
                 author = find_book_author(entry)
 
                 section_tag = entry.find_next('section', class_='card-content')
@@ -185,7 +208,7 @@ def parse_user_profile (profile_url: str) -> List[Review]:
                         break
                 reviews.append(fill_review(book_name, score, author,
                             book_url, image_url, profile_url,
-                            username, user_image_url))
+                            username, user_image_url, review_time_stamp))
                 clean_string = f"{username} reviewed {book_name} by {author}: {score}"
                 log.info(clean_string)
         log.info(f"Found {len(reviews)} reviews")
@@ -207,7 +230,97 @@ def get_users_reviews (users: List[BookUser]) -> List[Review]:
     log.debug(pprint(reviews))
     return reviews
 
+def convert_elapsed_to_timestamp(elapsed_time: str) -> str:
+    """Converts elapsed time to timestamp.
 
-#get_users_reviews(user_profile_url)
+    Converts elapsed time to timestamp.
+
+    Examples:
+        >>> convert_elapsed_to_timestamp("5 minutes ago")
+        'Sat, 30 Sep 2019 21:00:00 +0000'
+        >>> convert_elapsed_to_timestamp("6 hours ago")
+        'Sat, 30 Sep 2019 15:00:00 +0000'
+        >>> convert_elapsed_to_timestamp("6 seconds ago")
+        'Sat, 30 Sep 2019 21:00:06 +0000'
+
+    Notes:
+        The elapsed time is in format "5 minutes ago", "6 hours ago", "6 seconds ago".
+        The timestamp is in format "Sat, 30 Sep 2019 21:00:00 +0000".
+
+    Args:
+        elapsed_time (str): _description_
+
+    Returns:
+        str: _description_
+    """
+    # Map time units to corresponding timedelta units
+    date_format_no_seconds = "%Y-%m-%d %H:%M:00"
+    date_format_no_minutes = "%Y-%m-%d %H:00:00"
+    
+    time_unit_map = {
+        'second': 'seconds',
+        'seconds': 'seconds',
+        'minute': 'minutes',
+        'minutes': 'minutes',
+        'hour': 'hours',
+        'hours': 'hours',
+        'day': 'days',
+        'days': 'days',
+        'week': 'weeks',
+        'weeks': 'weeks',
+        'month': 'days',  # Approximation
+        'months': 'days', # Approximation
+        'year': 'days',   # Approximation
+        'years': 'days'   # Approximation
+    }
+    # Parse the input elapsed time string
+    parts = elapsed_time.split()
+    if parts[0] in ["an", "a"]:
+        quantity = 1
+        unit = parts[1]
+    elif len(parts) == 3:
+        quantity = int(parts[0])
+        unit = parts[1]
+    else:
+        try:
+            current_year = datetime.now().year
+            input_string_with_year = f"{elapsed_time} {current_year}"
+            target_date = datetime.strptime(input_string_with_year, "%b %d %Y")
+            formatted_date = target_date.strftime(date_format_no_seconds)
+            return formatted_date
+        except ValueError:
+            return "0"
+    
+    # Calculate the timestamp
+    current_time = datetime.now()
+    delta = timedelta(**{time_unit_map[unit]: quantity})
+    target_time = current_time - delta
+    
+    # Format the timestamp with time zone
+    timestamp_format = date_format_no_seconds
+    if parts[1] in ["hour", "hours"]: # To account of having no minutes info on "x hours ago"
+        timestamp_format = date_format_no_minutes
+        
+    formatted_timestamp = target_time.strftime(timestamp_format)
+    
+    
+    return formatted_timestamp
+
+def time_convert_test ():
+    # Test cases
+    elapsed_times = ["6 hours ago", "6 minutes ago", "6 seconds ago", "Jul 30"]
+    for elapsed_time in elapsed_times:
+        timestamp = convert_elapsed_to_timestamp(elapsed_time)
+        print(timestamp)
+"""time_convert_test()
+test_user: BookUser = {
+    "service": BOOKWYRM_SERVICE,
+    "id": 0,
+    "last_review_ts": 0,
+    "user_url": "https://bookwyrm.social/user/potajito",
+    "username": "Potajito",
+    "user_image_url": "https://cover2coverbookdesign.com/site/wp-content/uploads/2019/03/geometric1.jpg"
+    }"""
+#get_users_reviews([test_user])
 # parse_rss(rss_url)
     
