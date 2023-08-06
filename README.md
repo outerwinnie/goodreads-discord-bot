@@ -6,6 +6,9 @@
 - Integracion de la creacion de imagenes de Docker con Github CI
 
 
+## BUGS
+-  Forzar el checkeo de reviews sin usuarios añadidos peta el bot
+
 docker-compose.yml:
 
 ```
