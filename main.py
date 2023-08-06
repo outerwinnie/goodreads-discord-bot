@@ -155,7 +155,7 @@ async def add_user(interaction: discord.Interaction, user_input_url: str):
                 "service" : extracted_user["service"],
                 "id" : extracted_user["id"],
                 "user_url" : extracted_user["user_url"],
-                "last_review_ts" : datetime.datetime.now().strftime(DATE_FORMAT_OUTPUT)
+                "last_review_ts" : datetime.datetime.now().strftime(DATE_FORMAT_OUTPUT) # this is server time, maybe could be rss time?
                 }
     if data:
         users_id = [user["id"] for user in data["users"]]
