@@ -7,7 +7,7 @@
 
 
 ## BUGS
--  Forzar el checkeo de reviews sin usuarios añadidos peta el bot
+-  Peta cuando /add algo que no es una url de perfil de goodreads
 
 docker-compose.yml:
 
