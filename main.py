@@ -33,11 +33,16 @@ else:
     install(show_locals=False)
 
 def init_file_structure (users_json_path: str):
-    if not os.path.exists(users_json_path):
+    if not os.path.exists(DATA_FOLDER):
         os.makedirs(DATA_FOLDER)
         with open(users_json_path, "w") as f:
-            log.info("Json file doesn't exists, creating...")
+            log.info("Data folder doesn't exists, creating folder and .json file...")
             pass # Creates empty file if none exist
+    elif os.path.exists(DATA_FOLDER) and not os.path.exists(users_json_path):
+        with open(users_json_path, "w") as f:
+            log.info("Data folder exists, but .json file doesn't exists, creating...")
+            pass
+        
         
 init_file_structure(USERS_JSON_FILE_PATH)
 
