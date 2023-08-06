@@ -107,24 +107,27 @@ class UpdatesClient(commands.Bot):
             or force_check):
             log.info (f":books: Starting review check... :books:")
             if not self.msg_sent or force_check:
-                data = read_json_data (USERS_JSON_FILE_PATH)
-                reviews = rsh.get_reviews(data["users"])
-                new_reviews = check_new_reviews(reviews, data)
-                for review in new_reviews:
-                    score_star = get_stars(review['score'])
-                    
-                    embed = discord.Embed(title=review['title'] + ' ' + score_star,
-                                          description=review['author'],
-                                          url=review['url'])
-                    embed.set_author(name=review['username'],
-                                     url=review["user_url"], icon_url=review["user_image_url"])
-                    embed.set_thumbnail(url=review['image_url'])
-                    log.debug(f"Review sent for user: {review['username']}")
-                    await channel.send(embed=embed, mention_author=True)
-                self.msg_sent = True
-                reviews = []
-            log.info (f":books: Review check finished. Sent {len(new_reviews)} new reviews :books:")
-            #reviews = rsh.get_reviews(users)
+                try:
+                    data = read_json_data (USERS_JSON_FILE_PATH)
+                    reviews = rsh.get_reviews(data["users"])
+                    new_reviews = check_new_reviews(reviews, data)
+                    for review in new_reviews:
+                        score_star = get_stars(review['score'])
+                        
+                        embed = discord.Embed(title=review['title'] + ' ' + score_star,
+                                            description=review['author'],
+                                            url=review['url'])
+                        embed.set_author(name=review['username'],
+                                        url=review["user_url"], icon_url=review["user_image_url"])
+                        embed.set_thumbnail(url=review['image_url'])
+                        log.debug(f"Review sent for user: {review['username']}")
+                        await channel.send(embed=embed, mention_author=True)
+                    self.msg_sent = True
+                    reviews = []
+                    log.info (f":books: Review check finished. Sent {len(new_reviews)} new reviews :books:")
+                except KeyError:
+                    log.warning("Json file is empty")
+                #reviews = rsh.get_reviews(users)
         else:
             self.msg_sent = False
 
@@ -163,7 +166,7 @@ async def add_user(interaction: discord.Interaction, user_input_url: str):
        users.append(current_user)
     
     write_to_users_json(data)
-    reviews = rsh.get_reviews(users) # Need to fix to just 
+    # reviews = rsh.get_reviews(users) # Need to fix to just 
                                 # update reviews with this user reviews
     
     log.info (f"BookUser {user_input_url} added!")
