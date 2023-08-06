@@ -11,13 +11,14 @@ from rich.console import Console
 from rich.logging import RichHandler
 from bs4 import BeautifulSoup
 from configuration import LOGLEVEL, DATA_FOLDER, USERS_JSON_FILE_PATH, GOODREADS_SERVICE
+from configuration import TIME_ZONE, DATE_FORMAT_INPUT, DATE_FORMAT_OUTPUT
 import pytz
-from classes import Review, BookUser
+from classes import Review, BookUser, read_json_data, write_to_users_json
 import bookwyrm
 
 USERS_JSON_FILE_PATH = "data/users.json"
-DATE_FORMAT_INPUT = "%a, %d %b %Y %H:%M:%S %z"
-DATE_FORMAT_OUTPUT = "%Y-%m-%d %H:%M:%S"
+
+
 
 FORMAT = "%(message)s"
 logging.basicConfig(level=LOGLEVEL,
@@ -43,22 +44,8 @@ def get_user_image(user_id: str) -> str:
     return user_image_url
 
 
-def get_data_from_users_json(json_file_path=USERS_JSON_FILE_PATH) -> dict:
-    try:        
-        f = open(json_file_path, "r+")
-        data = json.load(f)
-        return data
-    except JSONDecodeError:
-        log.info("No users in json file")
-        return {}
-
-
 # data = get_data_from_users_json()
 
-
-def write_to_users_json(new_json_data, json_file_path=USERS_JSON_FILE_PATH):
-    with open(json_file_path, 'w') as json_file:
-        json.dump(new_json_data, json_file, indent=4, sort_keys=True)
 
 class RSSHelper:
 
@@ -103,9 +90,9 @@ class RSSHelper:
                             id += 1
 
                             # Check review is new
-                            data = get_data_from_users_json()
+                            """data = read_json_data()
                             date = datetime.datetime.strptime(entry.published, DATE_FORMAT_INPUT)
-                            review_date_timezoned = date.astimezone(pytz.timezone("Europe/Madrid"))
+                            review_date_timezoned = date.astimezone(pytz.timezone(TIME_ZONE))
                             log.debug(f"Review Datetime: {str(review_date_timezoned)}")
                             log.debug(f"Review timestamp: {review_date_timezoned.timestamp()}")
                             for i, user_ in enumerate(data["users"]):
@@ -122,8 +109,13 @@ class RSSHelper:
                                             DATE_FORMAT_OUTPUT)
                                         write_to_users_json(data)
                                     else:
-                                        log.debug("Old review, not sending.")
+                                        log.debug("Old review, not sending.")"""
 
+                            # Extract Review Timestamp
+                            date = datetime.datetime.strptime(entry.published, DATE_FORMAT_INPUT)
+                            review_date_timezoned = date.astimezone(pytz.timezone(TIME_ZONE))
+                            
+                            
                             # Extract Title
                             title = second_href[second_href.find(">") + 1: second_href.find("</a>")]
                             log.debug(f"Title found: {title}")
@@ -157,7 +149,8 @@ class RSSHelper:
                                 "image_url": image_url,
                                 "user_url": user["user_url"],
                                 "username": username,
-                                "user_image_url": user_image_url
+                                "user_image_url": user_image_url,
+                                "review_time_stamp": review_date_timezoned.strftime(DATE_FORMAT_OUTPUT),
                             })
                             log.debug(f"Review found from: {username} for: {title}")
                     except Exception as error:

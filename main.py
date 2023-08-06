@@ -12,11 +12,12 @@ from rich import print
 from rich.traceback import install
 from typing import List
 import configuration
-from configuration import LOGLEVEL, USERS_JSON_FILE_PATH, GOODREADS_SERVICE, BOOKWYRM_SERVICE
-from classes import Review, BookUser
+from configuration import LOGLEVEL, DATA_FOLDER, USERS_JSON_FILE_PATH, GOODREADS_SERVICE, BOOKWYRM_SERVICE
+from classes import Review, BookUser, check_new_reviews, get_stars, read_json_data
+from classes import read_json_data, write_to_users_json
 from rss_helper import RSSHelper
 from rss_helper import DATE_FORMAT_INPUT, DATE_FORMAT_OUTPUT
-from rss_helper import get_data_from_users_json, write_to_users_json
+
 
 FORMAT = "%(message)s"
 logging.basicConfig(level=LOGLEVEL,
@@ -33,6 +34,7 @@ else:
 
 def init_file_structure (users_json_path: str):
     if not os.path.exists(users_json_path):
+        os.makedirs(DATA_FOLDER)
         with open(users_json_path, "w") as f:
             log.info("Json file doesn't exists, creating...")
             pass # Creates empty file if none exist
@@ -89,19 +91,19 @@ class UpdatesClient(commands.Bot):
     @tasks.loop(seconds=5)
     async def timer(self, channel):
         global reviews
-        rand_debug = random.randrange(0,5)
+        rand_debug = random.randrange(0,4)
         log.debug(f":stopwatch: Starting timer... Random:{rand_debug} :stopwatch:")
         log.debug(f"Is sync? {self.synced}")
         current_time = datetime.datetime.now()
         #if current_time.minute == 2 or current_time.minute == 4:
         if rand_debug == 1: # Uncomment to test
             if not self.msg_sent:
-                i: int
-                for review in reviews:
-                    score_star = ''
-                    for x in range(review['score']):
-                        score_star += '★'
-
+                data = read_json_data (USERS_JSON_FILE_PATH)
+                reviews = rsh.get_reviews(data["users"])
+                new_reviews = check_new_reviews(reviews, data)
+                for review in new_reviews:
+                    score_star = get_stars(review['score'])
+                    
                     embed = discord.Embed(title=review['title'] + ' ' + score_star,
                                           description=review['author'],
                                           url=review['url'])
@@ -112,7 +114,7 @@ class UpdatesClient(commands.Bot):
                     await channel.send(embed=embed, mention_author=True)
                 self.msg_sent = True
                 reviews = []
-                reviews = rsh.get_reviews(users)
+                #reviews = rsh.get_reviews(users)
         else:
             self.msg_sent = False
 
@@ -130,7 +132,7 @@ async def add_user(interaction: discord.Interaction, user_input_url: str):
     users_id: List[str] = []
     extracted_user = extract_user_from_url(user_input_url)
     
-    data = get_data_from_users_json()
+    data = read_json_data()
     current_user: BookUser = {
                 "service" : extracted_user["service"],
                 "id" : extracted_user["id"],
@@ -172,7 +174,7 @@ async def remove_user(interaction: discord.Interaction, user_input_url: str):
 
     extracted_user = extract_user_from_url(user_input_url)
     
-    data = get_data_from_users_json()
+    data = read_json_data()
 
     for i, user in enumerate(data["users"]):
         if user["id"] == extracted_user["id"] and user["service"] == extracted_user["service"]:
