@@ -6,7 +6,6 @@ from discord.ext import commands, tasks
 import datetime
 import logging
 import os
-from urllib.parse import urlparse
 from rich.logging import RichHandler
 from rich import print
 from rich.traceback import install
@@ -14,7 +13,8 @@ from typing import List
 import configuration
 from configuration import LOGLEVEL, DATA_FOLDER, USERS_JSON_FILE_PATH, GOODREADS_SERVICE, BOOKWYRM_SERVICE
 from classes import Review, BookUser, check_new_reviews, get_stars, read_json_data
-from classes import read_json_data, write_to_users_json
+from classes import extract_user_from_url, read_json_data, write_to_users_json
+from exceptions import UrlNotValid
 from rss_helper import RSSHelper
 from rss_helper import DATE_FORMAT_INPUT, DATE_FORMAT_OUTPUT
 
@@ -139,11 +139,16 @@ tree = client.tree
 # Discord Slash Commands
 @tree.command(guild=discord.Object(id=GUILD_ID), name='add', description='Add BookUser')  # guild specific
 async def add_user(interaction: discord.Interaction, user_input_url: str):
-    await interaction.response.send_message("¡Añadido!", ephemeral=True)
+    
     global users
     global reviews
     users_id: List[str] = []
-    extracted_user = extract_user_from_url(user_input_url)
+    try:
+        extracted_user = extract_user_from_url(user_input_url)
+    except UrlNotValid:
+        log.error(f"URL {user_input_url} not supported!")
+        await interaction.response.send_message("URL not supported!", ephemeral=True)
+        return
     
     data = read_json_data()
     current_user: BookUser = {
@@ -168,7 +173,8 @@ async def add_user(interaction: discord.Interaction, user_input_url: str):
     write_to_users_json(data)
     # reviews = rsh.get_reviews(users) # Need to fix to just 
                                 # update reviews with this user reviews
-    
+                                
+    await interaction.response.send_message("¡Añadido!", ephemeral=True)
     log.info (f"BookUser {user_input_url} added!")
     log.info (f"New user list: {users}")
 
@@ -178,11 +184,15 @@ async def add_user(interaction: discord.Interaction, user_input_url: str):
 
 @tree.command(guild=discord.Object(id=GUILD_ID), name='remove', description='Remove User')  # guild specific
 async def remove_user(interaction: discord.Interaction, user_input_url: str):
-    await interaction.response.send_message("¡Eliminado!", ephemeral=True)
     global reviews
     global users
 
-    extracted_user = extract_user_from_url(user_input_url)
+    try:
+        extracted_user = extract_user_from_url(user_input_url)
+    except UrlNotValid:
+        log.error(f"URL {user_input_url} not supported!")
+        await interaction.response.send_message("URL not supported!", ephemeral=True)
+        return
     
     data = read_json_data()
 
@@ -193,9 +203,11 @@ async def remove_user(interaction: discord.Interaction, user_input_url: str):
     users = data["users"]
     
     if not extracted_user:
+        log.error(f"URL {user_input_url} not supported!")
         await interaction.response.send_message("URL not supported!", ephemeral=True)
         return
     
+    await interaction.response.send_message("¡Eliminado!", ephemeral=True)
     log.info (f"BookUser {user_input_url} removed!")
 
 @tree.command(guild=discord.Object(id=GUILD_ID), name='review_check', description='Trigger Review Check')  # guild specific
@@ -210,41 +222,6 @@ async def sync_bot(interaction: discord.Interaction):
                 id=GUILD_ID))
     await interaction.response.send_message("Bot synced!", ephemeral=True)
     log.info (f"Bot synced!") 
-
-def extract_user_from_url(url) -> dict:
-    parsed_url = urlparse(url)
-    if parsed_url.hostname == "goodreads.com" or parsed_url.hostname == "www.goodreads.com":
-        if "/author/" in parsed_url.path:
-            log.error(f"URL not supported!")
-            return {}
-        else:
-            user_id = parsed_url.path.split('/')[-1].split('-')[0]
-            user = {
-                "service": GOODREADS_SERVICE,
-                "id": user_id,
-                "user_url" : f"{parsed_url.scheme}://{parsed_url.hostname}{parsed_url.path}"
-            }
-            return user
-        
-    if parsed_url.hostname == "bookwyrm.social" or parsed_url.hostname == "www.bookwyrm.social":
-        if "/author/" in parsed_url.path:
-            log.error(f"URL not supported!")
-            return {}
-        else:
-            user_id = parsed_url.path.split('/')[-1]
-            user = {
-                "service": BOOKWYRM_SERVICE,
-                "id" : user_id,
-                "user_url" : f"{parsed_url.scheme}://{parsed_url.hostname}{parsed_url.path}"
-            }
-            log.debug(f"BookUser {user_id} found for Bookwyrm")
-            return user  
-    else:
-        log.error(f"URL not supported!")
-        return {}
-  
-
-    write_to_users_json(data)
 
 
 # Update Reviews

@@ -1,11 +1,13 @@
 from typing import TypedDict
 import logging
 import datetime, pytz
+from urllib.parse import urlparse
 from rich.logging import RichHandler
 from rich.traceback import install
 from rich.console import Console
-from configuration import LOGLEVEL, USERS_JSON_FILE_PATH
+from configuration import BOOKWYRM_SERVICE, GOODREADS_SERVICE, LOGLEVEL, USERS_JSON_FILE_PATH
 from configuration import TIME_ZONE, DATE_FORMAT_INPUT, DATE_FORMAT_OUTPUT
+from exceptions import UrlNotValid
 import json
 #from rss_helper import write_to_users_json
 
@@ -40,6 +42,44 @@ class BookUser(TypedDict):
     user_url: str
     username: str
     user_image_url: str
+
+def extract_user_from_url(url) -> dict:
+    parsed_url = urlparse(url)
+    if parsed_url.hostname == "goodreads.com" or parsed_url.hostname == "www.goodreads.com":
+        if "/author/" in parsed_url.path:
+            log.error(f"URL not supported!")
+            raise UrlNotValid
+        else:
+            user_id: str = parsed_url.path.split('/')[-1].split('-')[0]
+            user = {
+                "service": GOODREADS_SERVICE,
+                "id": user_id,
+                "user_url" : f"{parsed_url.scheme}://{parsed_url.hostname}{parsed_url.path}"
+            }
+            if user_id.isdigit():
+                log.debug(f"BookUser {user_id} found for Goodreads")
+                return user
+            else:
+                log.error(f"URL not supported!")
+                raise UrlNotValid
+        
+    if parsed_url.hostname == "bookwyrm.social" or parsed_url.hostname == "www.bookwyrm.social":
+        if "/author/" in parsed_url.path:
+            log.error(f"URL not supported!")
+            raise UrlNotValid
+        else:
+            user_id = parsed_url.path.split('/')[-1]
+            user = {
+                "service": BOOKWYRM_SERVICE,
+                "id" : user_id,
+                "user_url" : f"{parsed_url.scheme}://{parsed_url.hostname}{parsed_url.path}"
+            }
+            log.debug(f"BookUser {user_id} found for Bookwyrm")
+            return user  
+    else:
+        log.error(f"URL not supported!")
+        raise UrlNotValid
+
 
 def get_stars (score: int) -> str:
     score_star = ''
