@@ -67,7 +67,7 @@ except JSONDecodeError:
 
 # Variables
 rsh = RSSHelper()
-reviews: List[Review] = rsh.get_reviews(users)
+#reviews: List[Review] = rsh.get_reviews(users)
 intents = discord.Intents.default()
 intents.message_content = True
 
@@ -88,16 +88,20 @@ class UpdatesClient(commands.Bot):
             log.info(f"Successfully logged and synced in as {client.user}")
         await self.timer.start(channel)
                    
-    @tasks.loop(seconds=5)
-    async def timer(self, channel):
+    # @tasks.loop(seconds=5) # For debug purposes
+    @tasks.loop(minutes=5)
+    async def timer(self, channel, force_check=False):
         global reviews
         rand_debug = random.randrange(0,4)
         log.debug(f":stopwatch: Starting timer... Random:{rand_debug} :stopwatch:")
         log.debug(f"Is sync? {self.synced}")
         current_time = datetime.datetime.now()
-        if current_time.minute == 0 or current_time.minute == 15 or current_time.minute == 30 or current_time.minute == 45 :
         #if rand_debug == 1: # Uncomment to test
-            if not self.msg_sent:
+        if (current_time.minute == 0 or current_time.minute == 15 
+            or current_time.minute == 30 or current_time.minute == 45
+            or force_check):
+            log.info (f":books: Starting review check... :books:")
+            if not self.msg_sent or force_check:
                 data = read_json_data (USERS_JSON_FILE_PATH)
                 reviews = rsh.get_reviews(data["users"])
                 new_reviews = check_new_reviews(reviews, data)
@@ -114,7 +118,8 @@ class UpdatesClient(commands.Bot):
                     await channel.send(embed=embed, mention_author=True)
                 self.msg_sent = True
                 reviews = []
-                #reviews = rsh.get_reviews(users)
+            log.info (f":books: Review check finished. Sent {len(new_reviews)} new reviews :books:")
+            #reviews = rsh.get_reviews(users)
         else:
             self.msg_sent = False
 
@@ -158,15 +163,12 @@ async def add_user(interaction: discord.Interaction, user_input_url: str):
     
     log.info (f"BookUser {user_input_url} added!")
     log.info (f"New user list: {users}")
-            
-    
-    
 
     if not extracted_user:
         await interaction.response.send_message("URL not supported!", ephemeral=True)
         return
 
-@tree.command(guild=discord.Object(id=GUILD_ID), name='remove', description='Remove BookUser')  # guild specific
+@tree.command(guild=discord.Object(id=GUILD_ID), name='remove', description='Remove User')  # guild specific
 async def remove_user(interaction: discord.Interaction, user_input_url: str):
     await interaction.response.send_message("¡Eliminado!", ephemeral=True)
     global reviews
@@ -186,8 +188,13 @@ async def remove_user(interaction: discord.Interaction, user_input_url: str):
         await interaction.response.send_message("URL not supported!", ephemeral=True)
         return
     
-    
     log.info (f"BookUser {user_input_url} removed!")
+
+@tree.command(guild=discord.Object(id=GUILD_ID), name='review_check', description='Trigger Review Check')  # guild specific
+async def trigger_review_check(interaction: discord.Interaction):
+    await interaction.response.send_message("Triggering review check...", ephemeral=True)
+    await client.timer(client.get_channel(CHANNEL_ID), True)
+
 
 @tree.command(guild=discord.Object(id=GUILD_ID), name='sync', description='Sync bot (dev)')  # guild specific
 async def sync_bot(interaction: discord.Interaction):

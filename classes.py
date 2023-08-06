@@ -50,28 +50,20 @@ def get_stars (score: int) -> str:
 def check_new_reviews (reviews: list[Review], data: dict) -> list[Review]:
     log.info("Checking for new reviews")
     new_reviews = []
-    new_review_exists = False
     for user in data["users"]:
+        last_review_ts = datetime.datetime.strptime(user["last_review_ts"], DATE_FORMAT_OUTPUT)
         for review in reviews:
             if user["user_url"] == review["user_url"]:
-                review_date = datetime.datetime.strptime(review["review_time_stamp"], DATE_FORMAT_OUTPUT)
-                log.info(f"Review date for {review['title']}: {review_date}")
-                if datetime.datetime.strptime(user["last_review_ts"],
-                                    DATE_FORMAT_OUTPUT).timestamp() < review_date.timestamp():
+                # review_date = datetime.datetime.strptime(review["review_time_stamp"], DATE_FORMAT_OUTPUT)
+                if (last_review_ts.timestamp() < datetime.datetime.strptime(review["review_time_stamp"],DATE_FORMAT_OUTPUT).timestamp()):
                     new_reviews.append(review)
                     log.debug(f'User Review Datetime: {user["last_review_ts"]}')
-                    #log.debug(f'User Review timestamp: {datetime.datetime.strptime(user["last_review_ts"], DATE_FORMAT_OUTPUT).timestamp()}')
-                    log.info(f"New Review: {review['title']} by {user['user_url']}")
-                    #data["users"]["last_review_ts"] = review_date_timezoned.strftime(
-                    #DATE_FORMAT_OUTPUT)
-                    new_review_exists = True
-                    
+                    log.info(f"New review for {review['title']} by {user['user_url']} on {review['review_time_stamp']}")
+                    data_id = get_data_id_from_user_url(data, user["user_url"])
+                    if data["users"][data_id]["last_review_ts"] < review["review_time_stamp"]:
+                        data["users"][data_id]["last_review_ts"] = review["review_time_stamp"]
             else:
                 log.debug("Old review, not sending.")
-        if new_review_exists:
-            data_id = get_data_id_from_user_url(data, user["user_url"])
-            data["users"][data_id]["last_review_ts"] = datetime.datetime.strftime(review_date, DATE_FORMAT_OUTPUT)
-            new_review_exists = False
             
     write_to_users_json(data)
     return new_reviews

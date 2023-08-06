@@ -255,6 +255,7 @@ def convert_elapsed_to_timestamp(elapsed_time: str) -> str:
     # Map time units to corresponding timedelta units
     date_format_no_seconds = "%Y-%m-%d %H:%M:00"
     date_format_no_minutes = "%Y-%m-%d %H:00:00"
+    bad_date = "2023-03-27 00:00:00"
     
     time_unit_map = {
         'second': 'seconds',
@@ -274,21 +275,26 @@ def convert_elapsed_to_timestamp(elapsed_time: str) -> str:
     }
     # Parse the input elapsed time string
     parts = elapsed_time.split()
-    if parts[0] in ["an", "a"]:
-        quantity = 1
-        unit = parts[1]
-    elif parts[1] in time_unit_map:
-        quantity = int(parts[0])
-        unit = parts[1]
-    else:
+    if parts:
         try:
-            current_year = datetime.now().year
-            input_string_with_year = f"{elapsed_time} {current_year}"
-            target_date = datetime.strptime(input_string_with_year, "%b %d %Y")
-            formatted_date = target_date.strftime(date_format_no_seconds)
-            return formatted_date
-        except ValueError:
-            return "0"
+            if parts[0] in ["an", "a"]:
+                quantity = 1
+                unit = parts[1]
+            elif parts[1] in time_unit_map:
+                quantity = int(parts[0])
+                unit = parts[1]
+            else:
+                try:
+                    current_year = datetime.now().year
+                    input_string_with_year = f"{elapsed_time} {current_year}"
+                    target_date = datetime.strptime(input_string_with_year, "%b %d %Y")
+                    formatted_date = target_date.strftime(date_format_no_seconds)
+                    return formatted_date
+                except ValueError:
+                    return bad_date
+        except (ValueError, IndexError):
+            return bad_date
+        
     
     # Calculate the timestamp
     current_time = datetime.now()
