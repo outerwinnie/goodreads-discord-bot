@@ -12,7 +12,6 @@ import re, pytz
 import requests
 from urllib.parse import urlparse, urljoin
 from datetime import datetime, timedelta
-from dateutil import parser, relativedelta
 
 
 from configuration import LOGLEVEL, BOOKWYRM_SERVICE
@@ -278,7 +277,7 @@ def convert_elapsed_to_timestamp(elapsed_time: str) -> str:
     if parts[0] in ["an", "a"]:
         quantity = 1
         unit = parts[1]
-    elif len(parts) == 3:
+    elif parts[1] in time_unit_map:
         quantity = int(parts[0])
         unit = parts[1]
     else:
