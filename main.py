@@ -95,8 +95,8 @@ class UpdatesClient(commands.Bot):
         log.debug(f":stopwatch: Starting timer... Random:{rand_debug} :stopwatch:")
         log.debug(f"Is sync? {self.synced}")
         current_time = datetime.datetime.now()
-        #if current_time.minute == 2 or current_time.minute == 4:
-        if rand_debug == 1: # Uncomment to test
+        if current_time.minute == 0 or current_time.minute == 15 or current_time.minute == 30 or current_time.minute == 45 :
+        #if rand_debug == 1: # Uncomment to test
             if not self.msg_sent:
                 data = read_json_data (USERS_JSON_FILE_PATH)
                 reviews = rsh.get_reviews(data["users"])

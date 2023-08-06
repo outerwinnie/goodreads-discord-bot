@@ -67,10 +67,10 @@ def check_new_reviews (reviews: list[Review], data: dict) -> list[Review]:
                     #DATE_FORMAT_OUTPUT)
                     data_id = get_data_id_from_user_url(data, user["user_url"])
                     data["users"][data_id]["last_review_ts"] = datetime.datetime.strftime(review_date, DATE_FORMAT_OUTPUT)
-                    write_to_users_json(data)
+                    
             else:
                 log.debug("Old review, not sending.")
-    
+    write_to_users_json(data)
     return new_reviews
 
 def get_data_id_from_user_url(data: dict, user_url: str) -> int:

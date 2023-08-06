@@ -74,8 +74,8 @@ class RSSHelper:
                 # Get stars position
                 for i, entry in enumerate(rss_feed.entries):
                     try:
-                        log.debug(f"Entry #{i}: {entry}")
-                        log.debug(f"Entry description: {entry.description}")
+                        #log.debug(f"Entry #{i}: {entry}")
+                        #log.debug(f"Entry description: {entry.description}")
                         info = entry.description
                         second_href = info[info[info.find("href") + 1:].find("href"):]
                         star_position = info.find('star to <a class="bookTitle"')

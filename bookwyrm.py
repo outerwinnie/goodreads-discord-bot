@@ -12,6 +12,8 @@ import re, pytz
 import requests
 from urllib.parse import urlparse, urljoin
 from datetime import datetime, timedelta
+from dateutil import parser, relativedelta
+
 
 from configuration import LOGLEVEL, BOOKWYRM_SERVICE
 from configuration import TIME_ZONE, DATE_FORMAT_INPUT, DATE_FORMAT_OUTPUT
@@ -252,6 +254,9 @@ def convert_elapsed_to_timestamp(elapsed_time: str) -> str:
         str: _description_
     """
     # Map time units to corresponding timedelta units
+    date_format_no_seconds = "%Y-%m-%d %H:%M:00"
+    date_format_no_minutes = "%Y-%m-%d %H:00:00"
+    
     time_unit_map = {
         'second': 'seconds',
         'seconds': 'seconds',
@@ -281,11 +286,10 @@ def convert_elapsed_to_timestamp(elapsed_time: str) -> str:
             current_year = datetime.now().year
             input_string_with_year = f"{elapsed_time} {current_year}"
             target_date = datetime.strptime(input_string_with_year, "%b %d %Y")
-            formatted_date = target_date.strftime(DATE_FORMAT_OUTPUT)
+            formatted_date = target_date.strftime(date_format_no_seconds)
             return formatted_date
         except ValueError:
             return "0"
-
     
     # Calculate the timestamp
     current_time = datetime.now()
@@ -293,8 +297,12 @@ def convert_elapsed_to_timestamp(elapsed_time: str) -> str:
     target_time = current_time - delta
     
     # Format the timestamp with time zone
-    timestamp_format = DATE_FORMAT_OUTPUT
+    timestamp_format = date_format_no_seconds
+    if parts[1] in ["hour", "hours"]: # To account of having no minutes info on "x hours ago"
+        timestamp_format = date_format_no_minutes
+        
     formatted_timestamp = target_time.strftime(timestamp_format)
+    
     
     return formatted_timestamp
 
@@ -304,7 +312,7 @@ def time_convert_test ():
     for elapsed_time in elapsed_times:
         timestamp = convert_elapsed_to_timestamp(elapsed_time)
         print(timestamp)
-time_convert_test()
+"""time_convert_test()
 test_user: BookUser = {
     "service": BOOKWYRM_SERVICE,
     "id": 0,
@@ -312,7 +320,7 @@ test_user: BookUser = {
     "user_url": "https://bookwyrm.social/user/potajito",
     "username": "Potajito",
     "user_image_url": "https://cover2coverbookdesign.com/site/wp-content/uploads/2019/03/geometric1.jpg"
-    }
+    }"""
 #get_users_reviews([test_user])
 # parse_rss(rss_url)
     

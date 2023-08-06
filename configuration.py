@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-LOGLEVEL = logging.DEBUG
+LOGLEVEL = logging.INFO
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN_ENV")
 GUILD_ID = "757271564227182602" # string
 CHANNEL_ID = 815716163102179350 # int
