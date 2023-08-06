@@ -3,7 +3,8 @@ FROM python:3.11
 ADD main.py .
 ADD rss_helper.py .
 ADD configuration.py .
-COPY data /data/
+ADD classes.py .
+ADD bookwyrm.py .
 
 RUN pip install -U discord.py
 RUN pip install beautifulsoup4
