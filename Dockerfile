@@ -5,6 +5,7 @@ ADD rss_helper.py .
 ADD configuration.py .
 ADD classes.py .
 ADD bookwyrm.py .
+ADD exceptions.py .
 
 RUN pip install -U discord.py
 RUN pip install beautifulsoup4
