@@ -6,9 +6,6 @@
 - Integracion de la creacion de imagenes de Docker con Github CI
 
 
-## BUGS
--  Peta cuando /add algo que no es una url de perfil de goodreads
-
 docker-compose.yml:
 
 ```
@@ -20,7 +17,7 @@ services:
     environment:
       - TZ=Europe/Madrid
       - DISCORD_TOKEN_ENV=
-    mem_limit: 50m
+    mem_limit: 128m
     cpus: 0.1
     restart: unless-stoppe
 ```
