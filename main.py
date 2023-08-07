@@ -1,3 +1,4 @@
+import asyncio
 import random
 import json
 from json import JSONDecodeError
@@ -91,7 +92,9 @@ class UpdatesClient(commands.Bot):
                 id=GUILD_ID))  # guild specific: leave blank if global (global registration can take 1-24 hours)
             self.synced = True
             log.info(f"Successfully logged and synced in as {client.user}")
-        await self.timer.start(channel)
+        # asyncio.run(main_thread(self, channel))
+        self.keepalive.start()
+        self.timer.start(channel)
                    
     # @tasks.loop(seconds=5) # For debug purposes
     @tasks.loop(minutes=5)
@@ -109,33 +112,25 @@ class UpdatesClient(commands.Bot):
             if not self.msg_sent or force_check:
                 try:
                     data = read_json_data (USERS_JSON_FILE_PATH)
-                    reviews = rsh.get_reviews(data["users"])
-                    new_reviews = check_new_reviews(reviews, data)
-                    for review in new_reviews:
-                        score_star = get_stars(review['score'])
-                        
-                        embed = discord.Embed(title=review['title'] + ' ' + score_star,
-                                            description=review['author'],
-                                            url=review['url'])
-                        embed.set_author(name=review['username'],
-                                        url=review["user_url"], icon_url=review["user_image_url"])
-                        embed.set_thumbnail(url=review['image_url'])
-                        log.debug(f"Review sent for user: {review['username']}")
-                        await channel.send(embed=embed, mention_author=True)
-                    self.msg_sent = True
-                    reviews = []
-                    log.info (f":books: Review check finished. Sent {len(new_reviews)} new reviews :books:")
+                    rsh.get_reviews.start(data, client, channel)
                 except KeyError:
                     log.warning("Json file is empty")
-                #reviews = rsh.get_reviews(users)
         else:
             self.msg_sent = False
-
-
+        log.debug ("FINISHED LOOOOOOOOOP")
+        
+    @tasks.loop(seconds=5)        
+    async def keepalive(self):
+        await self.change_presence(activity=discord.Game(name=f"LoQueLeo"))
+        log.debug("I'm alive")
+            
 client = UpdatesClient(command_prefix='/', intents=discord.Intents().all())
 channel = client.get_channel(CHANNEL_ID)
 tree = client.tree
- 
+
+
+
+
 # Discord Slash Commands
 @tree.command(guild=discord.Object(id=GUILD_ID), name='add', description='Add BookUser')  # guild specific
 async def add_user(interaction: discord.Interaction, user_input_url: str):
@@ -203,7 +198,6 @@ async def trigger_review_check(interaction: discord.Interaction):
     await interaction.response.send_message("Triggering review check...", ephemeral=True)
     await client.timer(client.get_channel(CHANNEL_ID), True)
 
-
 @tree.command(guild=discord.Object(id=GUILD_ID), name='sync', description='Sync bot (dev)')  # guild specific
 async def sync_bot(interaction: discord.Interaction):
     await tree.sync(guild=discord.Object(
@@ -246,6 +240,11 @@ def extract_user_from_url(url) -> dict:
 
     write_to_users_json(data)
 
+
+async def main_thread(client: UpdatesClient, channel: discord.TextChannel):
+    keep_alive_task = asyncio.create_task(client.keepalive())
+    timer_task = asyncio.create_task(client.timer(channel))
+    await asyncio.gather(timer_task, keep_alive_task)
 
 # Update Reviews
 client.run(DISCORD_TOKEN)

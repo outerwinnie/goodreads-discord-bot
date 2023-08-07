@@ -1,6 +1,7 @@
 from typing import TypedDict
 import logging
 import datetime, pytz
+
 from rich.logging import RichHandler
 from rich.traceback import install
 from rich.console import Console
@@ -46,6 +47,7 @@ def get_stars (score: int) -> str:
     for x in range(score):
         score_star += '★'
     return score_star
+
 
 def check_new_reviews (reviews: list[Review], data: dict) -> list[Review]:
     log.info("Checking for new reviews")

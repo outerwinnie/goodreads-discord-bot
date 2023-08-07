@@ -4,6 +4,9 @@ import json
 from json import JSONDecodeError
 from typing import List
 import feedparser
+import discord
+from discord.channel import TextChannel
+from discord.ext import commands, tasks
 import logging
 import requests
 import datetime
@@ -13,7 +16,7 @@ from bs4 import BeautifulSoup
 from configuration import LOGLEVEL, DATA_FOLDER, USERS_JSON_FILE_PATH, GOODREADS_SERVICE
 from configuration import TIME_ZONE, DATE_FORMAT_INPUT, DATE_FORMAT_OUTPUT
 import pytz
-from classes import Review, BookUser, read_json_data, write_to_users_json
+from classes import Review, BookUser, read_json_data, write_to_users_json, check_new_reviews, get_stars
 import bookwyrm
 
 USERS_JSON_FILE_PATH = "data/users.json"
@@ -167,10 +170,26 @@ class RSSHelper:
         bookwyrm_reviews = bookwyrm.get_users_reviews(users)
         return bookwyrm_reviews
     
-    def get_reviews(self, users: List[BookUser]) -> List[Review]:
-        goodreads_reviews = self.get_rss_data_goodreads(users)
-        bookwyrm_reviews = self.get_bookwyrm_data(users)
-        return goodreads_reviews + bookwyrm_reviews
+    @tasks.loop(count=1)
+    async def get_reviews(self, data: dict, client:commands.Bot, channel: TextChannel) -> List[Review]:
+        goodreads_reviews = self.get_rss_data_goodreads(data["users"])
+        bookwyrm_reviews = self.get_bookwyrm_data(data["users"])
+        reviews = goodreads_reviews + bookwyrm_reviews
+        new_reviews = check_new_reviews(reviews, data)
+        for review in new_reviews:
+            score_star = get_stars(review['score'])
+            
+            embed = discord.Embed(title=review['title'] + ' ' + score_star,
+                                description=review['author'],
+                                url=review['url'])
+            embed.set_author(name=review['username'],
+                            url=review["user_url"], icon_url=review["user_image_url"])
+            embed.set_thumbnail(url=review['image_url'])
+            log.debug(f"Review sent for user: {review['username']}")
+            await channel.send(embed=embed, mention_author=True)
+        client.msg_sent = True
+        log.info (f":books: Review check finished. Sent {len(new_reviews)} new reviews :books:")
+        
             
 # Dependant Variables
 rsh = RSSHelper()
