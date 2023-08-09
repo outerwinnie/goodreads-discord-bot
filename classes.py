@@ -1,11 +1,8 @@
 from typing import TypedDict
 import logging
 import datetime, pytz
-<<<<<<< HEAD
 from urllib.parse import urlparse
-=======
 
->>>>>>> e7efa11bce936a421ae7529e0ac23ffc57e2a875
 from rich.logging import RichHandler
 from rich.traceback import install
 from rich.console import Console

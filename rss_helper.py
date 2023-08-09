@@ -157,7 +157,7 @@ class RSSHelper:
                             })
                             log.debug(f"Review found from: {username} for: {title}")
                     except Exception as error:
-                        console.print_exception()
+                        pass
                         # log.debug(f"Bad entry: {entry}")
             except Exception as error:
                 # logging.error(traceback.format_exc())
