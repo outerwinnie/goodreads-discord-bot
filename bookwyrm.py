@@ -125,6 +125,9 @@ def fill_review (title: str, score: int, author: str,
     Args:
         review (Review): _description_
     """ 
+    if review_time_stamp > datetime.strftime(datetime.now(),DATE_FORMAT_OUTPUT):
+        review_time_stamp = datetime.strptime(review_time_stamp, DATE_FORMAT_OUTPUT).replace(year=1984)
+        review_time_stamp = datetime.strftime(review_time_stamp, DATE_FORMAT_OUTPUT)
     current_review = {
             "title": title,
             "score": score,
@@ -300,15 +303,12 @@ def convert_elapsed_to_timestamp(elapsed_time: str) -> str:
     current_time = datetime.now()
     delta = timedelta(**{time_unit_map[unit]: quantity})
     target_time = current_time - delta
-    
     # Format the timestamp with time zone
     timestamp_format = date_format_no_seconds
     if parts[1] in ["hour", "hours"]: # To account of having no minutes info on "x hours ago"
         timestamp_format = date_format_no_minutes
         
     formatted_timestamp = target_time.strftime(timestamp_format)
-    
-    
     return formatted_timestamp
 
 def time_convert_test ():
