@@ -95,8 +95,8 @@ def check_new_reviews (reviews: list[Review], data: dict) -> list[Review]:
         for review in reviews:
             if user["user_url"] == review["user_url"]:
                 # review_date = datetime.datetime.strptime(review["review_time_stamp"], DATE_FORMAT_OUTPUT)
-                #if (last_review_ts.timestamp() < datetime.datetime.strptime(review["review_time_stamp"],DATE_FORMAT_OUTPUT).timestamp()):
-                if True:
+                if (last_review_ts.timestamp() < datetime.datetime.strptime(review["review_time_stamp"],DATE_FORMAT_OUTPUT).timestamp()):
+                #if True:
                     new_reviews.append(review)
                     log.debug(f'User Review Datetime: {user["last_review_ts"]}')
                     log.info(f"New review for {review['title']} by {user['user_url']} on {review['review_time_stamp']}")
