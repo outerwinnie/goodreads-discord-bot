@@ -2,8 +2,6 @@
 
 ##  MAYBE
 - Ajustar las fotos de perfil
-- Integracion de la creacion de imagenes de Docker con Github CI
-
 
 docker-compose.yml:
 
