@@ -137,7 +137,8 @@ def fill_review (title: str, score: int, author: str,
             "user_url": user_url,
             "username": username,
             "user_image_url": user_image_url,
-            "review_time_stamp": review_time_stamp
+            "review_time_stamp": review_time_stamp,
+            "review_text": ""
             }
     # log.debug(f"Added review: {current_review}")
     return current_review 

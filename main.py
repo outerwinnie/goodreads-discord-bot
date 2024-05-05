@@ -94,7 +94,7 @@ class UpdatesClient(commands.Bot):
         await self.timer.start(channel)
                    
     # @tasks.loop(seconds=5) # For debug purposes
-    @tasks.loop(minutes=5)
+    @tasks.loop(minutes=15)
     async def timer(self, channel, force_check=False):
         global reviews
         rand_debug = random.randrange(0,4)
@@ -102,34 +102,35 @@ class UpdatesClient(commands.Bot):
         log.debug(f"Is sync? {self.synced}")
         current_time = datetime.datetime.now()
         #if rand_debug == 1: # Uncomment to test
-        if (current_time.minute == 0 or current_time.minute == 15 
-            or current_time.minute == 30 or current_time.minute == 45
-            or force_check):
-            log.info (f":books: Starting review check... :books:")
-            if not self.msg_sent or force_check:
-                try:
-                    data = read_json_data (USERS_JSON_FILE_PATH)
-                    reviews = rsh.get_reviews(data["users"])
-                    new_reviews = check_new_reviews(reviews, data)
-                    for review in new_reviews:
-                        score_star = get_stars(review['score'])
-                        
-                        embed = discord.Embed(title=review['title'] + ' ' + score_star,
-                                            description=review['author'],
-                                            url=review['url'])
-                        embed.set_author(name=review['username'],
-                                        url=review["user_url"], icon_url=review["user_image_url"])
-                        embed.set_thumbnail(url=review['image_url'])
-                        log.debug(f"Review sent for user: {review['username']}")
-                        await channel.send(embed=embed, mention_author=True)
-                    self.msg_sent = True
-                    reviews = []
-                    log.info (f":books: Review check finished. Sent {len(new_reviews)} new reviews :books:")
-                except KeyError:
-                    log.warning("Json file is empty")
-                #reviews = rsh.get_reviews(users)
-        else:
-            self.msg_sent = False
+        #if (current_time.minute == 0 or current_time.minute == 15 
+        #    or current_time.minute == 30 or current_time.minute == 45
+        #    or force_check):
+        #if (not self.msg_sent) or force_check:
+        log.info (f":books: Starting review check... :books:")
+        try:
+            data = read_json_data (USERS_JSON_FILE_PATH)
+            reviews = rsh.get_reviews(data["users"])
+            new_reviews = check_new_reviews(reviews, data)
+            for review in new_reviews:
+                score_star = get_stars(review['score'])
+                
+                embed = discord.Embed(title=review['title'] + ' ' + score_star,
+                                    url=review['url'])
+                embed.set_author(name=review['username'],
+                                url=review["user_url"], icon_url=review["user_image_url"])
+                embed.set_thumbnail(url=review['image_url'])
+                if review['review_text'] == "":
+                    embed.description = f"{review['author']}"
+                else:
+                    embed.description = f"{review['author']}\n\n>>> {review['review_text']}"
+                log.debug(f"Review sent for user: {review['username']}")
+                await channel.send(embed=embed, mention_author=True)
+            self.msg_sent = True
+            reviews = []
+            log.info (f":books: Review check finished. Sent {len(new_reviews)} new reviews :books:")
+        except KeyError:
+            log.warning("Json file is empty")
+        #reviews = rsh.get_reviews(users)
 
 
 client = UpdatesClient(command_prefix='/', intents=discord.Intents().all())

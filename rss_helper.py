@@ -31,8 +31,9 @@ console = Console()
 
 def get_user_image(user_id: str) -> str:
     user_url = f"https://www.goodreads.com/user/show/{user_id}"  # f-string
-    page = requests.get(user_url)
-    soup = BeautifulSoup(page.content, "html.parser")
+    #page = requests.get(user_url)
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'}
+    soup = BeautifulSoup(requests.get(user_url,headers=headers).text, "html.parser")
     picture_elements = soup.find("div", class_="leftAlignedProfilePicture").find("a")
     for element in picture_elements:
         if element is not None:
@@ -75,7 +76,7 @@ class RSSHelper:
                 for i, entry in enumerate(rss_feed.entries):
                     try:
                         #log.debug(f"Entry #{i}: {entry}")
-                        log.debug(f"Entry description: {entry.description}")
+                        #log.debug(f"Entry description: {entry.description}")
                         info = entry.description
                         second_href = info[info[info.find("href") + 1:].find("href"):]
                         star_position = info.find('star to <a class="bookTitle"')
@@ -130,6 +131,15 @@ class RSSHelper:
                             elif stars_position != -1:
                                 score = info[stars_position - 2: stars_position].strip()
 
+                            # Extract Review Text
+                                review_text = ""
+                                try:
+                                    info_parsed = BeautifulSoup(info, "html.parser")
+                                    last_br_tag = info_parsed.find_all('br')[-1]
+                                    review_text = last_br_tag.find_next_sibling(text=True).strip()
+                                except:
+                                    log.debug("No review text found.")
+                            
                             # Extract Images
                             image_url = info[info.find('src=') + 5: info.find('" title')]
 
@@ -150,6 +160,7 @@ class RSSHelper:
                                 "user_url": user["user_url"],
                                 "username": username,
                                 "user_image_url": user_image_url,
+                                "review_text": review_text,
                                 "review_time_stamp": review_date_timezoned.strftime(DATE_FORMAT_OUTPUT),
                             })
                             log.debug(f"Review found from: {username} for: {title}")

@@ -34,6 +34,7 @@ class Review(TypedDict):
     user_url: str
     username: str
     user_image_url: str
+    review_text: str
 
 class BookUser(TypedDict):
     service: int
