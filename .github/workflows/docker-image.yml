@@ -9,7 +9,7 @@ jobs:
     steps:
      - uses: actions/checkout@v3
      - name: Build and push the image
-     run: |
-       docker login --username outerwinnie --password ${{ secrets.GH_PAT }} ghcr.io
-       docker build . --tag ghcr.io/outerwinnie/goodreads-discord-bot:latest
-       docker push ghcr.io/outerwinnie/goodreads-discord-bot:latest
+       run: |
+         docker login --username outerwinnie --password ${{ secrets.GH_PAT }} ghcr.io
+         docker build . --tag ghcr.io/outerwinnie/goodreads-discord-bot:latest
+         docker push ghcr.io/outerwinnie/goodreads-discord-bot:latest
