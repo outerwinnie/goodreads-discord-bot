@@ -1,18 +1,23 @@
-FROM python:3.11
+# For more information, please refer to https://aka.ms/vscode-docker-python
+FROM python:3-slim
 
-ADD main.py .
-ADD rss_helper.py .
-ADD configuration.py .
-ADD classes.py .
-ADD bookwyrm.py .
-ADD exceptions.py .
+# Keeps Python from generating .pyc files in the container
+ENV PYTHONDONTWRITEBYTECODE=1
 
-RUN pip install -U discord.py
-RUN pip install beautifulsoup4
-RUN pip install feedparser
-RUN pip install requests
-RUN pip install rich
-RUN pip install pytz
-RUN pip install load_dotenv
+# Turns off buffering for easier container logging
+ENV PYTHONUNBUFFERED=1
 
-CMD ["python", "./main.py"]
+# Install pip requirements
+COPY requirements.txt .
+RUN python -m pip install -r requirements.txt
+
+WORKDIR /app
+COPY . /app
+
+# Creates a non-root user with an explicit UID and adds permission to access the /app folder
+# For more info, please refer to https://aka.ms/vscode-docker-python-configure-containers
+RUN adduser -u 5678 --disabled-password --gecos "" appuser && chown -R appuser /app
+USER appuser
+
+# During debugging, this entry point will be overridden. For more information, please refer to https://aka.ms/vscode-docker-python-debug
+CMD ["python", "main.py"]

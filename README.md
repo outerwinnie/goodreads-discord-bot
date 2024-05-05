@@ -17,7 +17,5 @@ services:
     environment:
       - TZ=Europe/Madrid
       - DISCORD_TOKEN_ENV=
-    mem_limit: 128m
-    cpus: 0.1
-    restart: unless-stoppe
+    restart: unless-stopped
 ```
