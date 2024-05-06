@@ -194,8 +194,13 @@ def parse_user_profile (profile_url: str) -> List[Review]:
                 author = find_book_author(entry)
 
                 section_tag = entry.find_next('section', class_='card-content')
-                score_in_stars = section_tag.find('span', class_='is-sr-only').text.strip()
-                score = int(re.findall(r'\d+', score_in_stars)[0])
+                #score_in_stars = section_tag.find('span', class_='is-sr-only').text.strip()
+                article_tag = section_tag.find('article', class_='column ml-3-tablet my-3-mobile is-clipped')
+                score_in_stars = article_tag.find('span', class_="stars").text.strip()
+                try:
+                    score = int(re.findall(r'\d+', score_in_stars)[0])
+                except IndexError:
+                    score = 0
                 
                 section_a_tags = section_tag.find_all('a')
                 section_img_tag = section_tag.find("img", class_="book-cover")
@@ -326,4 +331,4 @@ def test_this ():
     log.debug(f' Trying {profile_url}')
     parse_user_profile(profile_url)
     
-#test_this()
+test_this()
