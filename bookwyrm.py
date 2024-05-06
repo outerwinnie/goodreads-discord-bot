@@ -321,24 +321,6 @@ def convert_elapsed_to_timestamp(elapsed_time: str) -> str:
     formatted_timestamp = target_time.strftime(timestamp_format)
     return formatted_timestamp
 
-def time_convert_test ():
-    # Test cases
-    elapsed_times = ["6 hours ago", "6 minutes ago", "6 seconds ago", "Jul 30"]
-    for elapsed_time in elapsed_times:
-        timestamp = convert_elapsed_to_timestamp(elapsed_time)
-        print(timestamp)
-"""time_convert_test()
-test_user: BookUser = {
-    "service": BOOKWYRM_SERVICE,
-    "id": 0,
-    "last_review_ts": 0,
-    "user_url": "https://bookwyrm.social/user/potajito",
-    "username": "Potajito",
-    "user_image_url": "https://cover2coverbookdesign.com/site/wp-content/uploads/2019/03/geometric1.jpg"
-    }"""
-#get_users_reviews([test_user])
-# parse_rss(rss_url)
-
 def test_this ():
     profile_url = 'https://bookwyrm.social/user/potajito'
     log.debug(f' Trying {profile_url}')

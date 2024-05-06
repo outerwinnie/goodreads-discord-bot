@@ -53,7 +53,6 @@ class RSSHelper:
     # Get RSS description
     def get_rss_data_goodreads(self, users: List[BookUser]) -> List[Review]:
         reviews = []
-        id = 0
         #user_list: List[BookUser] = [user for user in users]
         for user in users:
             if user["service"] != GOODREADS_SERVICE:
@@ -87,30 +86,6 @@ class RSSHelper:
                         # log.debug(f"Star found? {is_starred} Position? {stars_position}")
                         if is_starred:
                             log.debug("Review found!")
-
-                            id += 1
-
-                            # Check review is new
-                            """data = read_json_data()
-                            date = datetime.datetime.strptime(entry.published, DATE_FORMAT_INPUT)
-                            review_date_timezoned = date.astimezone(pytz.timezone(TIME_ZONE))
-                            log.debug(f"Review Datetime: {str(review_date_timezoned)}")
-                            log.debug(f"Review timestamp: {review_date_timezoned.timestamp()}")
-                            for i, user_ in enumerate(data["users"]):
-                                log.debug(f'User Review Datetime: {data["users"][i]["last_review_ts"]}')
-                                log.debug(
-                                    f'User Review timestamp: {datetime.datetime.strptime(data["users"][i]["last_review_ts"], DATE_FORMAT_OUTPUT).timestamp()}')
-
-                                if user_["id"] == user["id"]:
-                                    log.debug(f"User number: {i}")
-                                    if datetime.datetime.strptime(data["users"][i]["last_review_ts"],
-                                                                  DATE_FORMAT_OUTPUT).timestamp() < review_date_timezoned.timestamp():
-                                        log.debug("New Review!")
-                                        data["users"][i]["last_review_ts"] = review_date_timezoned.strftime(
-                                            DATE_FORMAT_OUTPUT)
-                                        write_to_users_json(data)
-                                    else:
-                                        log.debug("Old review, not sending.")"""
 
                             # Extract Review Timestamp
                             date = datetime.datetime.strptime(entry.published, DATE_FORMAT_INPUT)
