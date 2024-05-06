@@ -1,7 +1,9 @@
 import feedparser
 import logging
+import traceback
 import requests
 import datetime
+import re
 from bs4 import BeautifulSoup
 from rich.console import Console
 from rich.logging import RichHandler
@@ -15,8 +17,8 @@ logging.basicConfig(level="DEBUG",
 log = logging.getLogger("rich")
 console = Console()
 
-rss_feed_url = 'https://www.goodreads.com/user/updates_rss/34998873'
-log.debug(f"Trying for https://www.goodreads.com/user/updates_rss/34998873")
+rss_feed_url = 'https://www.goodreads.com/user/updates_rss/102039931'
+log.debug(f"Trying for {rss_feed_url}")
 
 feedparser.USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0"
 rss_feed = feedparser.parse(rss_feed_url, referrer="http://google.com")
@@ -40,11 +42,17 @@ for i, entry in enumerate(rss_feed.entries):
         # log.debug(f"Star found? {is_starred} Position? {stars_position}")
         # #Extract Review Text
         info_parsed = BeautifulSoup(info, "html.parser")
-        last_br_tag = info_parsed.find_all('br')[-1]
-        review_text = last_br_tag.find_next_sibling(text=True).strip()
-        print(review_text)
+        br_tags = info_parsed.find_all("br")
+        review_clean = ""
+        for tag in br_tags:
+            review_dirty = tag.next_sibling.get_text()
+            review_clean = review_clean + re.sub(r'^\s*', '',review_dirty).strip() + "\n"
+            review_clean = re.sub(r'^\s*', '',review_clean)
+        print(review_clean)
+        #review_text = br_tag.find("br").get_text()
         #review_text = info[]
+    except AttributeError:
+        log.debug("No review text found.")
     except Exception as error:
-        # logging.error(traceback.format_exc())
-        log.warning(f"Couldn't connect to RSS https://www.goodreads.com/user/updates")
+        logging.error(traceback.format_exc())
         #return []

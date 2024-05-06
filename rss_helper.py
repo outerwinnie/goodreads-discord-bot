@@ -1,6 +1,6 @@
 import traceback
 from pprint import pprint
-import json
+import json, re
 from json import JSONDecodeError
 from typing import List
 import feedparser
@@ -110,10 +110,15 @@ class RSSHelper:
                                 review_text = ""
                                 try:
                                     info_parsed = BeautifulSoup(info, "html.parser")
-                                    last_br_tag = info_parsed.find_all('br')[-1]
-                                    review_text = last_br_tag.find_next_sibling(text=True).strip()
-                                except:
+                                    br_tags = info_parsed.find_all("br")
+                                    for tag in br_tags:
+                                        review_dirty = tag.next_sibling.get_text()
+                                        review_text = review_text + re.sub(r'^\s*', '',review_dirty).strip() + "\n"
+                                        review_text = re.sub(r'^\s*', '',review_text)
+                                except AttributeError:
                                     log.debug("No review text found.")
+                                except Exception as error:
+                                    logging.error(traceback.format_exc())
                             
                             # Extract Images
                             image_url = info[info.find('src=') + 5: info.find('" title')]

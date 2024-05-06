@@ -224,6 +224,5 @@ async def sync_bot(interaction: discord.Interaction):
     await interaction.response.send_message("Bot synced!", ephemeral=True)
     log.info (f"Bot synced!") 
 
-
 # Update Reviews
 client.run(DISCORD_TOKEN)
