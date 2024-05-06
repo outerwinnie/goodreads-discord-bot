@@ -1,7 +1,8 @@
 # Goodreads-Bot
 
-##  MAYBE
+##  TODO
 - Ajustar las fotos de perfil
+- Imprementar las feeds de autores
 
 docker-compose.yml:
 
