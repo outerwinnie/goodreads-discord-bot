@@ -119,7 +119,7 @@ def find_time_elapsed(entry: NavigableString) -> str:
 
 def fill_review (title: str, score: int, author: str,
                 url: str, image_url: str, user_url: str,
-                username: str, user_image_url: str, review_time_stamp: str) -> Review:
+                username: str, user_image_url: str, review_time_stamp: str, review_text: str) -> Review:
     """Adds fields to Review class
 
     Args:
@@ -138,7 +138,7 @@ def fill_review (title: str, score: int, author: str,
             "username": username,
             "user_image_url": user_image_url,
             "review_time_stamp": review_time_stamp,
-            "review_text": ""
+            "review_text": review_text
             }
     # log.debug(f"Added review: {current_review}")
     return current_review 
@@ -157,6 +157,7 @@ def parse_user_profile (profile_url: str) -> List[Review]:
         #box_entries = soup.find_all('section', class_='card-content')
 
         for entry in header_entries:
+            review_text = ""
             if ' rated ' in entry.text:
                 username = entry.find('span', itemprop='name').text.strip()
                 book_name = find_book_title(entry)
@@ -182,7 +183,7 @@ def parse_user_profile (profile_url: str) -> List[Review]:
                         break
                 reviews.append(fill_review(book_name, score, author,
                                            book_url, image_url, profile_url,
-                                           username, user_image_url, review_time_stamp))
+                                           username, user_image_url, review_time_stamp, review_text))
                 clean_string = f"{username} rated {book_name} by {author}: {score}"
                 log.info(clean_string)
             if ' reviewed ' in entry.text:
@@ -198,6 +199,14 @@ def parse_user_profile (profile_url: str) -> List[Review]:
                 
                 section_a_tags = section_tag.find_all('a')
                 section_img_tag = section_tag.find("img", class_="book-cover")
+                
+                # Extract review text
+                try:
+                    review_text = section_tag.find('div', itemprop='reviewBody').find('p').text
+                except Exception as error:
+                    review_text = ""
+                    log.debug(f"No review text found")
+                
                 try:
                     image_url = section_img_tag.get('src')
                 except Exception:
@@ -211,8 +220,8 @@ def parse_user_profile (profile_url: str) -> List[Review]:
                         break
                 reviews.append(fill_review(book_name, score, author,
                             book_url, image_url, profile_url,
-                            username, user_image_url, review_time_stamp))
-                clean_string = f"{username} reviewed {book_name} by {author}: {score}"
+                            username, user_image_url, review_time_stamp, review_text))
+                clean_string = f"{username} reviewed {book_name} by {author}: {score}\n Review: {review_text}"
                 log.info(clean_string)
         log.info(f"Found {len(reviews)} reviews")
         #log.debug(pprint(reviews))
@@ -329,4 +338,10 @@ test_user: BookUser = {
     }"""
 #get_users_reviews([test_user])
 # parse_rss(rss_url)
+
+def test_this ():
+    profile_url = 'https://bookwyrm.social/user/potajito'
+    log.debug(f' Trying {profile_url}')
+    parse_user_profile(profile_url)
     
+#test_this()
