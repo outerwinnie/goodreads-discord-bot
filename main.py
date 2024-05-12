@@ -13,7 +13,7 @@ from typing import List
 import configuration
 from configuration import LOGLEVEL, DATA_FOLDER, USERS_JSON_FILE_PATH, GOODREADS_SERVICE, BOOKWYRM_SERVICE
 from classes import Review, BookUser, check_new_reviews, get_stars, read_json_data
-from classes import extract_user_from_url, read_json_data, write_to_users_json
+from classes import extract_user_from_url, read_json_data, write_to_users_json, format_review_text
 from exceptions import UrlNotValid
 from rss_helper import RSSHelper
 from rss_helper import DATE_FORMAT_INPUT, DATE_FORMAT_OUTPUT
@@ -122,8 +122,8 @@ class UpdatesClient(commands.Bot):
                 if review['review_text'] == "":
                     embed.description = f"{review['author']}"
                 else:
-                    embed.description = f"{review['author']}\n\n>>> {review['review_text']}"
-                log.debug(f"Review sent for user: {review['username']}")
+                    embed.description = format_review_text(review)
+                log.info(f"Review sent for user: {review['username']}")
                 await channel.send(embed=embed, mention_author=True)
             self.msg_sent = True
             reviews = []

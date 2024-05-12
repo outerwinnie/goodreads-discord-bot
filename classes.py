@@ -35,6 +35,7 @@ class Review(TypedDict):
     username: str
     user_image_url: str
     review_text: str
+    review_url: str
 
 class BookUser(TypedDict):
     service: int
@@ -88,6 +89,20 @@ def get_stars (score: int) -> str:
         score_star += '★'
     return score_star
 
+def is_old_review (user: BookUser, review: Review):
+    last_review_ts = datetime.datetime.strptime(user["last_review_ts"], DATE_FORMAT_OUTPUT)
+    if user["user_url"] == review["user_url"]:
+        if (last_review_ts.timestamp() < datetime.datetime.strptime(review["review_time_stamp"],DATE_FORMAT_OUTPUT).timestamp()):
+            #new_reviews.append(review)
+            log.debug(f'User Review Datetime: {user["last_review_ts"]}')
+            log.info(f"New review for {review['title']} by {user['user_url']} on {review['review_time_stamp']}")
+            if user["last_review_ts"] < review["review_time_stamp"]:
+                return False
+        else:
+            log.debug(f"Old review: {review['title']}. Stopping loop.")
+            return True
+            
+
 def check_new_reviews (reviews: list[Review], data: dict) -> list[Review]:
     log.info("Checking for new reviews")
     new_reviews = []
@@ -109,6 +124,15 @@ def check_new_reviews (reviews: list[Review], data: dict) -> list[Review]:
             
     write_to_users_json(data)
     return new_reviews
+
+def format_review_text (review: Review) -> str:
+    max_review_lenght = 350
+    if len(review["review_text"]) > max_review_lenght:
+        review["review_text"] = review["review_text"][:max_review_lenght] + "..."
+    review["review_text"] = (f"{review['author']}\n\n"
+                            f">>> {review['review_text']}\n"
+                            f"[Ver reseña completa]({review['review_url']})")
+    return review["review_text"]
 
 def get_data_id_from_user_url(data: dict, user_url: str) -> int:
     for i, user in enumerate(data["users"]):

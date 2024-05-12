@@ -56,3 +56,5 @@ for i, entry in enumerate(rss_feed.entries):
     except Exception as error:
         logging.error(traceback.format_exc())
         #return []
+        
+print(len("aaa"))

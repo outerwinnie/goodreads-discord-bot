@@ -8,6 +8,7 @@ from rich.console import Console
 from rich.logging import RichHandler
 from urllib.parse import urlparse, urljoin
 import re
+from bookwyrm import *
 from classes import Review, BookUser
 
 FORMAT = "%(message)s"

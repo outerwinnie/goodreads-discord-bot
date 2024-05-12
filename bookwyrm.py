@@ -17,6 +17,7 @@ from datetime import datetime, timedelta
 from configuration import LOGLEVEL, BOOKWYRM_SERVICE
 from configuration import TIME_ZONE, DATE_FORMAT_INPUT, DATE_FORMAT_OUTPUT
 from classes import Review, BookUser
+from classes import is_old_review
 
 if logging.root.level == logging.DEBUG:
     install(show_locals=True)
@@ -103,6 +104,19 @@ def find_book_author(entry: NavigableString) -> str:
     except Exception:
         return 'Unknown author'
 
+def find_review_url(entry: NavigableString, profile_url: str) -> str:
+    try:
+        href_pattern = re.compile(r'https://bookwyrm\.social/user/.+')
+        tag: NavigableString = entry.find('a', href=href_pattern)
+        if tag:
+            review_url = tag['href']
+            if review_url:
+                return review_url
+        else:
+            return profile_url        
+    except Exception:
+        return profile_url
+
 def find_time_elapsed(entry: NavigableString) -> str:
     try:
         href_pattern = re.compile(r'https://bookwyrm\.social/user/.+')
@@ -119,7 +133,8 @@ def find_time_elapsed(entry: NavigableString) -> str:
 
 def fill_review (title: str, score: int, author: str,
                 url: str, image_url: str, user_url: str,
-                username: str, user_image_url: str, review_time_stamp: str, review_text: str) -> Review:
+                username: str, user_image_url: str, review_time_stamp: str,
+                review_text: str, review_url: str) -> Review:
     """Adds fields to Review class
 
     Args:
@@ -138,12 +153,14 @@ def fill_review (title: str, score: int, author: str,
             "username": username,
             "user_image_url": user_image_url,
             "review_time_stamp": review_time_stamp,
-            "review_text": review_text
+            "review_text": review_text,
+            "review_url": review_url
             }
     # log.debug(f"Added review: {current_review}")
     return current_review 
    
-def parse_user_profile (profile_url: str) -> List[Review]:
+def parse_user_profile (user: BookUser) -> List[Review]:
+    profile_url = user['user_url']
     reviews: List[Review] = []
     try:
         profile_url_domain = urlparse(profile_url).hostname
@@ -162,6 +179,7 @@ def parse_user_profile (profile_url: str) -> List[Review]:
                 username = entry.find('span', itemprop='name').text.strip()
                 book_name = find_book_title(entry)
                 time_elapsed_str = find_time_elapsed(entry)
+                review_url = find_review_url(entry, profile_url)
                 review_time_stamp = convert_elapsed_to_timestamp(time_elapsed_str)
                 score_in_stars = entry.select_one('.stars .is-sr-only').text.strip()
                 score = int(re.findall(r'\d+', score_in_stars)[0])
@@ -181,15 +199,21 @@ def parse_user_profile (profile_url: str) -> List[Review]:
                         
                         # log.debug(book_url)
                         break
-                reviews.append(fill_review(book_name, score, author,
-                                           book_url, image_url, profile_url,
-                                           username, user_image_url, review_time_stamp, review_text))
+                review = fill_review(book_name, score, author,
+                            book_url, image_url, profile_url,
+                            username, user_image_url, review_time_stamp,
+                            review_text, review_url)
+                reviews.append(review)
                 clean_string = f"{username} rated {book_name} by {author}: {score}"
                 log.info(clean_string)
+                if is_old_review(user, review):
+                    log.info(f"Finished checking reviews, found old review")
+                    break
             if ' reviewed ' in entry.text:
                 username = entry.find('span', itemprop='name').text.strip()
                 book_name = find_book_title(entry)
                 time_elapsed_str = find_time_elapsed(entry)
+                review_url = find_review_url(entry, profile_url)
                 review_time_stamp = convert_elapsed_to_timestamp(time_elapsed_str)
                 author = find_book_author(entry)
 
@@ -223,11 +247,18 @@ def parse_user_profile (profile_url: str) -> List[Review]:
                         
                         # log.debug(book_url)
                         break
-                reviews.append(fill_review(book_name, score, author,
+                review = fill_review(book_name, score, author,
                             book_url, image_url, profile_url,
-                            username, user_image_url, review_time_stamp, review_text))
+                            username, user_image_url, review_time_stamp,
+                            review_text, review_url)
+                reviews.append(review)
+                
                 clean_string = f"{username} reviewed {book_name} by {author}: {score}\n Review: {review_text}"
                 log.info(clean_string)
+                if is_old_review(user, review):
+                    log.info(f"Finished checking reviews, found old review")
+                    break
+            
         log.info(f"Found {len(reviews)} reviews")
         #log.debug(pprint(reviews))
         return reviews
@@ -242,9 +273,9 @@ def get_users_reviews (users: List[BookUser]) -> List[Review]:
     reviews: List[Review] = [] 
     for user in users:
         if user['service'] == BOOKWYRM_SERVICE:
-            user_reviews = parse_user_profile(user['user_url'])
+            user_reviews = parse_user_profile(user)
             reviews = reviews + user_reviews
-    log.debug(pprint(reviews))
+    #log.debug(pprint(reviews))
     return reviews
 
 def convert_elapsed_to_timestamp(elapsed_time: str) -> str:
@@ -326,9 +357,9 @@ def convert_elapsed_to_timestamp(elapsed_time: str) -> str:
     formatted_timestamp = target_time.strftime(timestamp_format)
     return formatted_timestamp
 
-def test_this ():
+""" def test_this ():
     profile_url = 'https://bookwyrm.social/user/potajito'
-    log.debug(f' Trying {profile_url}')
+   log.debug(f' Trying {profile_url}')
     parse_user_profile(profile_url)
     
-test_this()
+test_this() """

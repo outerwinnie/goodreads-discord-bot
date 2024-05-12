@@ -13,7 +13,7 @@ from bs4 import BeautifulSoup
 from configuration import LOGLEVEL, DATA_FOLDER, USERS_JSON_FILE_PATH, GOODREADS_SERVICE
 from configuration import TIME_ZONE, DATE_FORMAT_INPUT, DATE_FORMAT_OUTPUT
 import pytz
-from classes import Review, BookUser, read_json_data, write_to_users_json
+from classes import Review, BookUser, read_json_data, write_to_users_json, is_old_review
 import bookwyrm
 
 USERS_JSON_FILE_PATH = "data/users.json"
@@ -100,6 +100,10 @@ class RSSHelper:
                             author_extract = second_href[second_href.find('<a class="authorName"'):]
                             author = author_extract[author_extract.find(">") + 1: author_extract.find("</a>")]
 
+                            # Extract Review URL
+                            review_url = entry.link
+                            log.debug(f"Review URL found: {review_url}")
+                            
                             # Extract Score
                             if star_position != -1:
                                 score = info[star_position - 2: star_position].strip()
@@ -130,8 +134,7 @@ class RSSHelper:
                                 user_image_url = get_user_image(user["id"])
                             except:
                                 user_image_url = "https://i.imgur.com/9pNffkj.png"
-
-                            reviews.append( {
+                            review = {
                                 "title": title,
                                 "score": int(score),
                                 "author": author,
@@ -141,9 +144,14 @@ class RSSHelper:
                                 "username": username,
                                 "user_image_url": user_image_url,
                                 "review_text": review_text,
+                                "review_url": review_url,
                                 "review_time_stamp": review_date_timezoned.strftime(DATE_FORMAT_OUTPUT),
-                            })
+                            }
+                            reviews.append(review)
                             log.debug(f"Review found from: {username} for: {title}")
+                            if is_old_review(user, review):
+                                log.info(f"Finished checking reviews for user {username}, found old review")
+                                break
                     except Exception as error:
                         console.print_exception()
                         # log.debug(f"Bad entry: {entry}")

@@ -3,10 +3,29 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-LOGLEVEL = logging.DEBUG
+#.ENVS
+
+if os.getenv("LOGLEVEL") is None:
+    LOGLEVEL=logging.INFO
+else:
+    LOGLEVEL = int(os.getenv("LOGLEVEL"))
+    ### LOGLEVELS
+
+    #CRITICAL = 50
+    #FATAL = CRITICAL
+    #ERROR = 40
+    #WARNING = 30
+    #WARN = WARNING
+    #INFO = 20
+    #DEBUG = 10
+    #NOTSET = 0
+    
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN_ENV")
-GUILD_ID = "757271564227182602" # string
-CHANNEL_ID = 815716163102179350 # int
+GUILD_ID = os.getenv("GUILD_ID") # string
+CHANNEL_ID = os.getenv("CHANNEL_ID") # int
+
+#.ENVS
+
 DATA_FOLDER = "data"
 USERS_JSON_FILE_NAME = "users.json"  
 USERS_JSON_FILE_PATH = os.path.join(DATA_FOLDER,USERS_JSON_FILE_NAME)
