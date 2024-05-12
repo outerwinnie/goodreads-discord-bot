@@ -30,19 +30,36 @@ console = Console()
 
 
 def get_user_image(user_id: str) -> str:
-    user_url = f"https://www.goodreads.com/user/show/{user_id}"  # f-string
+    user_url = f"https://www.goodreads.com/user/show/{user_id}"
     #page = requests.get(user_url)
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'}
     soup = BeautifulSoup(requests.get(user_url,headers=headers).text, "html.parser")
-    picture_elements = soup.find("div", class_="leftAlignedProfilePicture").find("a")
-    for element in picture_elements:
-        if element is not None:
-            user_image_url = element["src"]
-            log.debug(f"URL found for {user_id} : {user_image_url}")
-        else:
-            user_image_url = None
-            log.debug(f"Not found {user_id} : {user_image_url}")
+    try:
+        picture_elements = soup.find("div", class_="leftAlignedProfilePicture").find("a")
+        for element in picture_elements:
+            if element is not None:
+                user_image_url = element["src"]
+                log.debug(f"URL found for {user_id} : {user_image_url}")
+                return user_image_url
+    except Exception as e:
+        log.info(f"No picture found for user {user_id}, trying if author...")
+        
+    # try if author page
+    try:
+        picture_elements = soup.find("div", class_="leftContainer authorLeftContainer").find("a")
+        for element in picture_elements:
+            if element is not None:
+                user_image_url = element["src"]
+                log.debug(f"URL found for {user_id} : {user_image_url}")
+                return user_image_url
+    except Exception as e:
+        log.info(f"No picture found for user {user_id}, using generic")
+        
+    ## Image not found, return generic   
+    user_image_url = "https://i.imgur.com/9pNffkj.png"
+    log.debug(f"Not found {user_id} : {user_image_url}")
     return user_image_url
+    
 
 
 # data = get_data_from_users_json()
@@ -129,11 +146,8 @@ class RSSHelper:
 
                             # Extract URL
                             url = info[9: info.find('">')]
-
-                            try:
-                                user_image_url = get_user_image(user["id"])
-                            except:
-                                user_image_url = "https://i.imgur.com/9pNffkj.png"
+                            user_image_url = get_user_image(user["id"])
+                            
                             review = {
                                 "title": title,
                                 "score": int(score),
