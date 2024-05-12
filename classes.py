@@ -2,6 +2,8 @@ from typing import TypedDict
 import logging
 import datetime, pytz
 from urllib.parse import urlparse
+from bs4 import BeautifulSoup
+import requests
 from rich.logging import RichHandler
 from rich.traceback import install
 from rich.console import Console
@@ -23,6 +25,7 @@ logging.basicConfig(level=LOGLEVEL,
                     datefmt="[%X]",
                     handlers=[RichHandler(markup=True, rich_tracebacks=True)])
 log = logging.getLogger("rich")
+headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'}
 
 class Review(TypedDict):
     title: str
@@ -49,21 +52,38 @@ def extract_user_from_url(url) -> dict:
     parsed_url = urlparse(url)
     if parsed_url.hostname == "goodreads.com" or parsed_url.hostname == "www.goodreads.com":
         if "/author/" in parsed_url.path:
-            log.error(f"URL not supported!")
-            raise UrlNotValid
-        else:
+            try: 
+                soup = BeautifulSoup(requests.get(url,headers=headers).text, "html.parser")
+                author_url = soup.find('link', rel='alternate', title='Bookshelves')
+                if author_url:
+                    parsed_url = urlparse(author_url.get('href'))
+                    user_id: str = parsed_url.path.split('/')[-1]
+                    user_url = f"https://www.goodreads.com/user/show/{user_id}"
+                    user = {
+                        "service": GOODREADS_SERVICE,
+                        "id": user_id,
+                        "user_url" : user_url
+                        }
+                    log.info(f"Author URL found for Goodreads : {user_url}")
+                else:
+                    log.error(f"Author URL not found!")
+                    raise UrlNotValid
+            except Exception as e:
+                log.error(f"Issue with author URL!")
+                raise UrlNotValid
+        else:    
             user_id: str = parsed_url.path.split('/')[-1].split('-')[0]
             user = {
                 "service": GOODREADS_SERVICE,
                 "id": user_id,
                 "user_url" : f"{parsed_url.scheme}://{parsed_url.hostname}{parsed_url.path}"
             }
-            if user_id.isdigit():
-                log.debug(f"BookUser {user_id} found for Goodreads")
-                return user
-            else:
-                log.error(f"URL not supported!")
-                raise UrlNotValid
+        if user_id.isdigit():
+            log.debug(f"BookUser {user_id} found for Goodreads")
+            return user
+        else:
+            log.error(f"URL not supported!")
+            raise UrlNotValid
         
     if parsed_url.hostname == "bookwyrm.social" or parsed_url.hostname == "www.bookwyrm.social":
         if "/author/" in parsed_url.path:

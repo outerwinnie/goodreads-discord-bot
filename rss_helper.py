@@ -152,6 +152,8 @@ class RSSHelper:
                             if is_old_review(user, review):
                                 log.info(f"Finished checking reviews for user {username}, found old review")
                                 break
+                    except AttributeError:
+                        log.debug(f"Bad entry: {i}")
                     except Exception as error:
                         console.print_exception()
                         # log.debug(f"Bad entry: {entry}")
