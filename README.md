@@ -2,7 +2,6 @@
 
 ##  TODO
 - Ajustar las fotos de perfil
-- Imprementar las feeds de autores
 
 docker-compose.yml:
 
@@ -17,6 +16,7 @@ services:
       - CHANNEL_ID=
       - GUILD_ID=
       - DISCORD_TOKEN=
+      - LOGLEVEL={20-10}
       - PGID=1000
       - PUID=1000
     restart: unless-stopped
