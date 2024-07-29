@@ -1,5 +1,5 @@
 import traceback
-import logging, os
+import logging, os, validators
 from types import NoneType
 from typing import List
 from rich.logging import RichHandler
@@ -15,7 +15,7 @@ from datetime import datetime, timedelta
 
 
 from configuration import LOGLEVEL, BOOKWYRM_SERVICE
-from configuration import TIME_ZONE, DATE_FORMAT_INPUT, DATE_FORMAT_OUTPUT
+from configuration import TIME_ZONE, DATE_FORMAT_INPUT, HEADERS, DATE_FORMAT_OUTPUT
 from classes import Review, BookUser
 from classes import is_old_review
 
@@ -106,7 +106,9 @@ def find_book_author(entry: NavigableString) -> str:
 
 def find_review_url(entry: NavigableString, profile_url: str) -> str:
     try:
-        href_pattern = re.compile(r'https://bookwyrm\.social/user/.+')
+        parsed_url = urlparse(profile_url)
+        hostmane = re.escape(parsed_url.hostname)
+        href_pattern = re.compile(rf'https://{hostmane}/user/.+')
         tag: NavigableString = entry.find('a', href=href_pattern)
         if tag:
             review_url = tag['href']
@@ -117,9 +119,11 @@ def find_review_url(entry: NavigableString, profile_url: str) -> str:
     except Exception:
         return profile_url
 
-def find_time_elapsed(entry: NavigableString) -> str:
+def find_time_elapsed(entry: NavigableString, profile_url: str) -> str:
     try:
-        href_pattern = re.compile(r'https://bookwyrm\.social/user/.+')
+        parsed_url = urlparse(profile_url)
+        hostmane = re.escape(parsed_url.hostname)
+        href_pattern = re.compile(rf'https://{hostmane}/user/.+')
         tag: NavigableString = entry.find('a', href=href_pattern)
         if tag:
             time_elapsed_str = tag.get_text().strip()
@@ -166,10 +170,11 @@ def parse_user_profile (user: BookUser) -> List[Review]:
         profile_url_domain = urlparse(profile_url).hostname
         profile_url_scheme = urlparse(profile_url).scheme
         reviews_url = append_to_url(profile_url,'/reviews-comments')
-        soup = BeautifulSoup(requests.get(reviews_url).text,"html.parser")
+        soup = BeautifulSoup(requests.get(reviews_url, headers=HEADERS).text,"html.parser")
         
         user_image_url = soup.find('img', class_=re.compile(r'avatar image*')).get('src')
-         
+        if not validators.url(user_image_url):
+            user_image_url = f"{profile_url_scheme}://{profile_url_domain}{user_image_url}" 
         header_entries: List[NavigableString] = soup.find_all('div', class_='media-content')
         #box_entries = soup.find_all('section', class_='card-content')
 
@@ -178,7 +183,7 @@ def parse_user_profile (user: BookUser) -> List[Review]:
             if ' rated ' in entry.text:
                 username = entry.find('span', itemprop='name').text.strip()
                 book_name = find_book_title(entry)
-                time_elapsed_str = find_time_elapsed(entry)
+                time_elapsed_str = find_time_elapsed(entry, profile_url)
                 review_url = find_review_url(entry, profile_url)
                 review_time_stamp = convert_elapsed_to_timestamp(time_elapsed_str)
                 score_in_stars = entry.select_one('.stars .is-sr-only').text.strip()
@@ -190,6 +195,8 @@ def parse_user_profile (user: BookUser) -> List[Review]:
                 section_img_tag = section_tag.find("img", class_="book-cover")
                 try:
                     image_url = section_img_tag.get('src')
+                    if not validators.url(image_url):
+                        image_url = f"{profile_url_scheme}://{profile_url_domain}{image_url}" 
                 except Exception:
                     image_url = 'https://cover2coverbookdesign.com/site/wp-content/uploads/2019/03/geometric1.jpg'
                 
@@ -212,7 +219,7 @@ def parse_user_profile (user: BookUser) -> List[Review]:
             if ' reviewed ' in entry.text:
                 username = entry.find('span', itemprop='name').text.strip()
                 book_name = find_book_title(entry)
-                time_elapsed_str = find_time_elapsed(entry)
+                time_elapsed_str = find_time_elapsed(entry, profile_url)
                 review_url = find_review_url(entry, profile_url)
                 review_time_stamp = convert_elapsed_to_timestamp(time_elapsed_str)
                 author = find_book_author(entry)
@@ -238,6 +245,8 @@ def parse_user_profile (user: BookUser) -> List[Review]:
                 
                 try:
                     image_url = section_img_tag.get('src')
+                    if not validators.url(image_url):
+                        image_url = f"{profile_url_scheme}://{profile_url_domain}{image_url}" 
                 except Exception:
                     image_url = 'https://cover2coverbookdesign.com/site/wp-content/uploads/2019/03/geometric1.jpg'
                 

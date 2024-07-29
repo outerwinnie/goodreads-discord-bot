@@ -25,7 +25,10 @@ feedparser.USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/2010010
 rss_feed = feedparser.parse(rss_feed_url, referrer="http://google.com")
 
 def extract_user_from_url(url) -> dict:
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'}
+    headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3',
+    'Accept-Language': 'en-US,en;q=0.9'
+    }
     parsed_url = urlparse(url)
     if parsed_url.hostname == "goodreads.com" or parsed_url.hostname == "www.goodreads.com":
         if "/author/" in parsed_url.path:

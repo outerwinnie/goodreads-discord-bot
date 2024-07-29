@@ -7,7 +7,7 @@ import requests
 from rich.logging import RichHandler
 from rich.traceback import install
 from rich.console import Console
-from configuration import BOOKWYRM_SERVICE, BOOKWYRM_INSTANCES, GOODREADS_SERVICE, LOGLEVEL, USERS_JSON_FILE_PATH
+from configuration import BOOKWYRM_SERVICE, BOOKWYRM_INSTANCES, HEADERS, GOODREADS_SERVICE, LOGLEVEL, USERS_JSON_FILE_PATH
 from configuration import TIME_ZONE, DATE_FORMAT_INPUT, DATE_FORMAT_OUTPUT
 from exceptions import UrlNotValid
 import json
@@ -25,8 +25,10 @@ logging.basicConfig(level=LOGLEVEL,
                     datefmt="[%X]",
                     handlers=[RichHandler(markup=True, rich_tracebacks=True)])
 log = logging.getLogger("rich")
-headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'}
-
+headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3',
+    'Accept-Language': 'en-US,en;q=0.9'
+}
 class Review(TypedDict):
     title: str
     score: int
@@ -53,7 +55,7 @@ def extract_user_from_url(url) -> dict:
     if parsed_url.hostname == "goodreads.com" or parsed_url.hostname == "www.goodreads.com":
         if "/author/" in parsed_url.path:
             try: 
-                soup = BeautifulSoup(requests.get(url,headers=headers).text, "html.parser")
+                soup = BeautifulSoup(requests.get(url,headers=HEADERS).text, "html.parser")
                 author_url = soup.find('link', rel='alternate', title='Bookshelves')
                 if author_url:
                     parsed_url = urlparse(author_url.get('href'))

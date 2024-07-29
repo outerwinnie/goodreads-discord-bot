@@ -10,7 +10,7 @@ import datetime
 from rich.console import Console
 from rich.logging import RichHandler
 from bs4 import BeautifulSoup
-from configuration import LOGLEVEL, DATA_FOLDER, USERS_JSON_FILE_PATH, GOODREADS_SERVICE
+from configuration import LOGLEVEL, DATA_FOLDER, HEADERS, USERS_JSON_FILE_PATH, GOODREADS_SERVICE
 from configuration import TIME_ZONE, DATE_FORMAT_INPUT, DATE_FORMAT_OUTPUT
 import pytz
 from classes import Review, BookUser, read_json_data, write_to_users_json, is_old_review
@@ -32,8 +32,11 @@ console = Console()
 def get_user_image(user_id: str) -> str:
     user_url = f"https://www.goodreads.com/user/show/{user_id}"
     #page = requests.get(user_url)
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'}
-    soup = BeautifulSoup(requests.get(user_url,headers=headers).text, "html.parser")
+    headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3',
+    'Accept-Language': 'en-US,en;q=0.9'
+    }    
+    soup = BeautifulSoup(requests.get(user_url,headers=HEADERS).text, "html.parser")
     try:
         picture_elements = soup.find("div", class_="leftAlignedProfilePicture").find("a")
         for element in picture_elements:
