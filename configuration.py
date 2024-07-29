@@ -31,6 +31,12 @@ USERS_JSON_FILE_NAME = "users.json"
 USERS_JSON_FILE_PATH = os.path.join(DATA_FOLDER,USERS_JSON_FILE_NAME)
 GOODREADS_SERVICE = 0
 BOOKWYRM_SERVICE = 1
+BOOKWYRM_INSTANCES = [
+    "bookwyrm.social",
+    "www.bookwyrm.social",
+    "lectura.social",
+    "www.lectura.social"
+]
 
 TIME_ZONE = "Europe/Madrid"
 DATE_FORMAT_INPUT = "%a, %d %b %Y %H:%M:%S %z"

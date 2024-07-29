@@ -7,7 +7,7 @@ import requests
 from rich.logging import RichHandler
 from rich.traceback import install
 from rich.console import Console
-from configuration import BOOKWYRM_SERVICE, GOODREADS_SERVICE, LOGLEVEL, USERS_JSON_FILE_PATH
+from configuration import BOOKWYRM_SERVICE, BOOKWYRM_INSTANCES, GOODREADS_SERVICE, LOGLEVEL, USERS_JSON_FILE_PATH
 from configuration import TIME_ZONE, DATE_FORMAT_INPUT, DATE_FORMAT_OUTPUT
 from exceptions import UrlNotValid
 import json
@@ -85,7 +85,7 @@ def extract_user_from_url(url) -> dict:
             log.error(f"URL not supported!")
             raise UrlNotValid
         
-    if parsed_url.hostname == "bookwyrm.social" or parsed_url.hostname == "www.bookwyrm.social":
+    if parsed_url.hostname in BOOKWYRM_INSTANCES:
         if "/author/" in parsed_url.path:
             log.error(f"URL not supported!")
             raise UrlNotValid
