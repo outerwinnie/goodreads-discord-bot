@@ -144,9 +144,10 @@ def fill_review (title: str, score: int, author: str,
     Args:
         review (Review): _description_
     """ 
-    if review_time_stamp > datetime.strftime(datetime.now(),DATE_FORMAT_OUTPUT):
-        review_time_stamp = datetime.strptime(review_time_stamp, DATE_FORMAT_OUTPUT).replace(year=1984)
-        review_time_stamp = datetime.strftime(review_time_stamp, DATE_FORMAT_OUTPUT)
+    if review_time_stamp > datetime.now(review_time_stamp.tzinfo):
+        review_time_stamp = review_time_stamp.replace(year=1984)
+
+    review_time_stamp = review_time_stamp.strftime(DATE_FORMAT_OUTPUT)
     current_review = {
             "title": title,
             "score": score,
@@ -162,127 +163,129 @@ def fill_review (title: str, score: int, author: str,
             }
     # log.debug(f"Added review: {current_review}")
     return current_review 
-   
+
 def parse_user_profile (user: BookUser) -> List[Review]:
-    profile_url = user['user_url']
     reviews: List[Review] = []
-    try:
-        profile_url_domain = urlparse(profile_url).hostname
-        profile_url_scheme = urlparse(profile_url).scheme
-        reviews_url = append_to_url(profile_url,'/reviews-comments')
-        soup = BeautifulSoup(requests.get(reviews_url, headers=HEADERS).text,"html.parser")
-        
-        user_image_url = soup.find('img', class_=re.compile(r'avatar image*')).get('src')
-        if not validators.url(user_image_url):
-            user_image_url = f"{profile_url_scheme}://{profile_url_domain}{user_image_url}" 
-        header_entries: List[NavigableString] = soup.find_all('div', class_='media-content')
-        #box_entries = soup.find_all('section', class_='card-content')
 
-        for entry in header_entries:
-            review_text = ""
-            if ' rated ' in entry.text:
-                username = entry.find('span', itemprop='name').text.strip()
-                book_name = find_book_title(entry)
-                time_elapsed_str = find_time_elapsed(entry, profile_url)
-                review_url = find_review_url(entry, profile_url)
-                review_time_stamp = convert_elapsed_to_timestamp(time_elapsed_str)
-                score_in_stars = entry.select_one('.stars .is-sr-only').text.strip()
-                score = int(re.findall(r'\d+', score_in_stars)[0])
+    response = requests.get(
+    user["user_url"],
+    headers={
+        "User-Agent": "bookwyrm-review-reader/1.0",
+        "Accept": "application/activity+json",
+    },
+    timeout=10,
+    )
+    response.raise_for_status()
 
-                section_tag = entry.find_next('section', class_='card-content')
-                author = find_book_author(section_tag)
-                section_a_tags = section_tag.find_all('a')
-                section_img_tag = section_tag.find("img", class_="book-cover")
-                try:
-                    image_url = section_img_tag.get('src')
-                    if not validators.url(image_url):
-                        image_url = f"{profile_url_scheme}://{profile_url_domain}{image_url}" 
-                except Exception:
-                    image_url = 'https://cover2coverbookdesign.com/site/wp-content/uploads/2019/03/geometric1.jpg'
-                
-                for a_tag in section_a_tags:
-                    if "/book/" in a_tag.get('href'):
-                        book_url = f"{profile_url_scheme}://{profile_url_domain}{a_tag.get('href')}" 
-                        
-                        # log.debug(book_url)
-                        break
-                review = fill_review(book_name, score, author,
-                            book_url, image_url, profile_url,
-                            username, user_image_url, review_time_stamp,
-                            review_text, review_url)
-                reviews.append(review)
-                clean_string = f"{username} rated {book_name} by {author}: {score}"
-                log.info(clean_string)
-                if is_old_review(user, review):
-                    log.info(f"Finished checking reviews, found old review")
-                    break
-            if ' reviewed ' in entry.text:
-                username = entry.find('span', itemprop='name').text.strip()
-                book_name = find_book_title(entry)
-                time_elapsed_str = find_time_elapsed(entry, profile_url)
-                review_url = find_review_url(entry, profile_url)
-                review_time_stamp = convert_elapsed_to_timestamp(time_elapsed_str)
-                author = find_book_author(entry)
+    data = response.json()
 
-                section_tag = entry.find_next('section', class_='card-content')
-                #score_in_stars = section_tag.find('span', class_='is-sr-only').text.strip()
-                article_tag = section_tag.find('article', class_='column ml-3-tablet my-3-mobile is-clipped')
-                score_in_stars = article_tag.find('span', class_="stars").text.strip()
-                try:
-                    score = int(re.findall(r'\d+', score_in_stars)[0])
-                except IndexError:
-                    score = 0
-                
-                section_a_tags = section_tag.find_all('a')
-                section_img_tag = section_tag.find("img", class_="book-cover")
-                
-                # Extract review text
-                try:
-                    review_text = section_tag.find('div', itemprop='reviewBody').find('p').text
-                except Exception as error:
-                    review_text = ""
-                    log.debug(f"No review text found")
-                
-                try:
-                    image_url = section_img_tag.get('src')
-                    if not validators.url(image_url):
-                        image_url = f"{profile_url_scheme}://{profile_url_domain}{image_url}" 
-                except Exception:
-                    image_url = 'https://cover2coverbookdesign.com/site/wp-content/uploads/2019/03/geometric1.jpg'
-                
-                for a_tag in section_a_tags:
-                    if "/book/" in a_tag.get('href'):
-                        book_url = f"{profile_url_scheme}://{profile_url_domain}{a_tag.get('href')}" 
-                        
-                        # log.debug(book_url)
-                        break
-                review = fill_review(book_name, score, author,
-                            book_url, image_url, profile_url,
-                            username, user_image_url, review_time_stamp,
-                            review_text, review_url)
-                reviews.append(review)
-                
-                clean_string = f"{username} reviewed {book_name} by {author}: {score}\n Review: {review_text}"
-                log.info(clean_string)
-                if is_old_review(user, review):
-                    log.info(f"Finished checking reviews, found old review")
-                    break
-            
-        log.info(f"Found {len(reviews)} reviews")
-        #log.debug(pprint(reviews))
+    if response.status_code != 200:
+        log.error(
+            f"Could not fetch BookWyrm user {user['user_url']}. "
+            f"Status: {response.status_code}"
+        )
         return reviews
+
+    try:
+        data = response.json()
+        log.debug(f"Fetched BookWyrm user profile data! Valid JSON!")
+    except requests.exceptions.JSONDecodeError:
+        log.error(f"Invalid JSON returned by {user['user_url']}. Cannot parse user profile.")
+        return reviews
+
+    icon = data.get("icon", {})
+
+    username = data.get("preferredUsername", "")
+    user_image_url = icon.get("url", "")
+    user_outbox_url = data.get("outbox", "")
+    user_outbox = requests.get(
+    user_outbox_url,
+    headers={
+        "User-Agent": "bookwyrm-review-reader/1.0",
+    },
+    timeout=10,
+    )
+
+    user_outbox.raise_for_status()
+    user_outbox_data = user_outbox.json()
+    outbox_first_url = user_outbox_data.get("first", "")
+    outbox_first_data = requests.get(
+    outbox_first_url,
+    headers={
+        "User-Agent": "bookwyrm-review-reader/1.0",
+    },
+    timeout=10,
+    )
+    outbox_first_data.raise_for_status()
+    outbox_first_data = outbox_first_data.json()
+
+    for item in outbox_first_data.get("orderedItems", []):
+        print(f"Processing item: {item.get('id', 'No ID')}, type: {item.get('type', 'No Type')}" )
+        if item.get("type") != "Article":
+            continue
+        content = item.get("content", "")
+
+        if not content:
+            continue
+        # Extract book name, score, author, review text, image URL, and review URL from the content
+        title = item.get("name", "")
+        score = parse_score(title)
+        book_name = parse_book_name(title)
+        
+        review_text_match = re.search(r'<p>(.*?)</p>', content, re.DOTALL)
+        review_text = review_text_match.group(1).strip() if review_text_match else ""
+        capsule_image_url = item.get("attachment", "")[0].get("url", "")
+        book_reviewed = item.get("inReplyToBook", "")
+
+        book_url = requests.get(book_reviewed, headers=
+                                {"User-Agent": "bookwyrm-review-reader/1.0", 
+                                 "Accept": "application/activity+json"}, 
+                                 timeout=10)
+        
+        book_url.raise_for_status()
+        book_url_data = book_url.json()
+
+        author = "Unknown author"
+        match = re.match(r"^(.+?):\s*(?=[^(]+(?:\(|$))", book_url_data.get("cover", "").get("name", ""))
+
+        if match:
+            author = match.group(1).strip()
+
+
+        book_url_img = book_url_data.get("cover", "").get("url", "")
+
+        if not book_url_img:
+            book_url_img = capsule_image_url
+
+        published = datetime.fromisoformat(item.get("published", ""))
+        review_url = item.get("id", "")
+
+        review = fill_review(
+                book_name,
+                score,
+                author,
+                book_reviewed,
+                book_url_img,
+                user['user_url'],
+                username,
+                user_image_url,
+                published,
+                review_text,
+                review_url,
+            )
+        reviews.append(review)
+        log.debug(f"Added review: {review}")
     
-                        
-    except Exception as error:
-        print('Could not parse:', reviews_url)
-        console.print_exception()
-        return []
+    return reviews
+
 
 def get_users_reviews (users: List[BookUser]) -> List[Review]:
     reviews: List[Review] = [] 
     for user in users:
         if user['service'] == BOOKWYRM_SERVICE:
             user_reviews = parse_user_profile(user)
+            log.debug(reviews)
+            log.debug(user_reviews)
             reviews = reviews + user_reviews
     #log.debug(pprint(reviews))
     return reviews

@@ -50,8 +50,12 @@ class BookUser(TypedDict):
     username: str
     user_image_url: str
 
-def extract_user_from_url(url) -> dict:
+def extract_user_from_url(url: str) -> dict:
+    if not url.startswith(("http://", "https://")):
+            url = f"https://{url}"
+            
     parsed_url = urlparse(url)
+    
     if parsed_url.hostname == "goodreads.com" or parsed_url.hostname == "www.goodreads.com":
         if "/author/" in parsed_url.path:
             try: 
@@ -101,6 +105,7 @@ def extract_user_from_url(url) -> dict:
             log.debug(f"BookUser {user_id} found for Bookwyrm")
             return user  
     else:
+        log.debug(f"Bookwyrm? instance found: {parsed_url.hostname}")
         log.error(f"URL not supported!")
         raise UrlNotValid
 
