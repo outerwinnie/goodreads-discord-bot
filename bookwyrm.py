@@ -220,7 +220,6 @@ def parse_user_profile (user: BookUser) -> List[Review]:
     outbox_first_data = outbox_first_data.json()
 
     for item in outbox_first_data.get("orderedItems", []):
-        print(f"Processing item: {item.get('id', 'No ID')}, type: {item.get('type', 'No Type')}" )
         if item.get("type") != "Article":
             continue
         content = item.get("content", "")

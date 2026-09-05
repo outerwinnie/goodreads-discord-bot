@@ -6,7 +6,7 @@ load_dotenv()
 #.ENVS
 
 if os.getenv("LOGLEVEL") is None:
-    LOGLEVEL=logging.DEBUG
+    LOGLEVEL=logging.INFO
 else:
     LOGLEVEL = int(os.getenv("LOGLEVEL"))
     ### LOGLEVELS
