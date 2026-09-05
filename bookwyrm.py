@@ -32,6 +32,11 @@ logging.basicConfig(level=LOGLEVEL,
                     handlers=[RichHandler(markup=True, rich_tracebacks=True)])
 log = logging.getLogger("rich")
 
+BOOKWYRM_HEADERS = {
+    "User-Agent": "bookwyrm-review-reader/1.0",
+    "Accept-Language": "en-US",
+}
+
 #rss_url = "https://bookwyrm.social/user/potajito/rss-reviews"
 #user_profile_url = "https://bookwyrm.social/user/potajito"
 
@@ -164,117 +169,127 @@ def fill_review (title: str, score: int, author: str,
     # log.debug(f"Added review: {current_review}")
     return current_review 
 
-def parse_user_profile (user: BookUser) -> List[Review]:
+def bookwyrm_get(url: str, *, activity_json: bool = False) -> requests.Response:
+    """Make a GET request to BookWyrm with the appropriate headers."""
+    headers = BOOKWYRM_HEADERS.copy()
+    if activity_json:
+        headers["Accept"] = "application/activity+json"
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        return response
+
+def parse_user_profile(user: BookUser) -> List[Review]:
     reviews: List[Review] = []
 
-    response = requests.get(
-    user["user_url"],
-    headers={
-        "User-Agent": "bookwyrm-review-reader/1.0",
-        "Accept": "application/activity+json",
-    },
-    timeout=10,
-    )
-    response.raise_for_status()
-
-    data = response.json()
-
-    if response.status_code != 200:
+    # Fetch user profile
+    try:
+        response = bookwyrm_get(user["user_url"], activity_json=True)
+        data = response.json()
+        log.debug("Fetched BookWyrm user profile data! Valid JSON!")
+    except requests.exceptions.JSONDecodeError:
         log.error(
-            f"Could not fetch BookWyrm user {user['user_url']}. "
-            f"Status: {response.status_code}"
+            f"Invalid JSON returned by {user['user_url']}. "
+            "Cannot parse user profile."
         )
         return reviews
-
-    try:
-        data = response.json()
-        log.debug(f"Fetched BookWyrm user profile data! Valid JSON!")
-    except requests.exceptions.JSONDecodeError:
-        log.error(f"Invalid JSON returned by {user['user_url']}. Cannot parse user profile.")
+    except requests.exceptions.RequestException as exc:
+        log.error(f"Could not fetch BookWyrm user {user['user_url']}: {exc}")
         return reviews
 
-    icon = data.get("icon", {})
+    icon = data.get("icon") or {}
 
     username = data.get("preferredUsername", "")
     user_image_url = icon.get("url", "")
     user_outbox_url = data.get("outbox", "")
-    user_outbox = requests.get(
-    user_outbox_url,
-    headers={
-        "User-Agent": "bookwyrm-review-reader/1.0",
-    },
-    timeout=10,
-    )
 
-    user_outbox.raise_for_status()
+    # Fetch user's outbox
+    user_outbox = bookwyrm_get(user_outbox_url)
     user_outbox_data = user_outbox.json()
+
     outbox_first_url = user_outbox_data.get("first", "")
-    outbox_first_data = requests.get(
-    outbox_first_url,
-    headers={
-        "User-Agent": "bookwyrm-review-reader/1.0",
-    },
-    timeout=10,
-    )
-    outbox_first_data.raise_for_status()
-    outbox_first_data = outbox_first_data.json()
+
+    # Fetch first page of outbox
+    outbox_first = bookwyrm_get(outbox_first_url)
+    outbox_first_data = outbox_first.json()
 
     for item in outbox_first_data.get("orderedItems", []):
         if item.get("type") != "Article":
             continue
-        content = item.get("content", "")
 
+        content = item.get("content", "")
         if not content:
             continue
-        # Extract book name, score, author, review text, image URL, and review URL from the content
+
+        # Extract book name and score from review title
         title = item.get("name", "")
         score = parse_score(title)
         book_name = parse_book_name(title)
-        
-        review_text_match = re.search(r'<p>(.*?)</p>', content, re.DOTALL)
-        review_text = review_text_match.group(1).strip() if review_text_match else ""
-        capsule_image_url = item.get("attachment", "")[0].get("url", "")
+
+        # Extract review text
+        review_text_match = re.search(
+            r"<p>(.*?)</p>",
+            content,
+            re.DOTALL,
+        )
+        review_text = (
+            review_text_match.group(1).strip()
+            if review_text_match
+            else ""
+        )
+
+        # Get image attached to the review
+        attachments = item.get("attachment") or []
+        capsule_image_url = (
+            attachments[0].get("url", "")
+            if attachments
+            else ""
+        )
+
         book_reviewed = item.get("inReplyToBook", "")
 
-        book_url = requests.get(book_reviewed, headers=
-                                {"User-Agent": "bookwyrm-review-reader/1.0", 
-                                 "Accept": "application/activity+json"}, 
-                                 timeout=10)
-        
-        book_url.raise_for_status()
-        book_url_data = book_url.json()
+        # Fetch book information
+        book_response = bookwyrm_get(
+            book_reviewed,
+            activity_json=True,
+        )
+        book_data = book_response.json()
 
+        cover = book_data.get("cover") or {}
+        book_title = cover.get("name", "")
+
+        # Extract author from strings such as:
+        # "Han Kang: La vegetariana (Paperback, Español language, 2024)"
         author = "Unknown author"
-        match = re.match(r"^(.+?):\s*(?=[^(]+(?:\(|$))", book_url_data.get("cover", "").get("name", ""))
+        author_match = re.match(
+            r"^(.+?):\s*(?=[^(]+(?:\(|$))",
+            book_title,
+        )
 
-        if match:
-            author = match.group(1).strip()
+        if author_match:
+            author = author_match.group(1).strip()
 
-
-        book_url_img = book_url_data.get("cover", "").get("url", "")
-
-        if not book_url_img:
-            book_url_img = capsule_image_url
+        book_url_img = cover.get("url", "") or capsule_image_url
 
         published = datetime.fromisoformat(item.get("published", ""))
         review_url = item.get("id", "")
 
         review = fill_review(
-                book_name,
-                score,
-                author,
-                book_reviewed,
-                book_url_img,
-                user['user_url'],
-                username,
-                user_image_url,
-                published,
-                review_text,
-                review_url,
-            )
+            book_name,
+            score,
+            author,
+            book_reviewed,
+            book_url_img,
+            user["user_url"],
+            username,
+            user_image_url,
+            published,
+            review_text,
+            review_url,
+        )
+
         reviews.append(review)
         log.debug(f"Added review: {review}")
-    
+
     return reviews
 
 
