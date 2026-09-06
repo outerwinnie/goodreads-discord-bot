@@ -203,14 +203,30 @@ def parse_user_profile(user: BookUser) -> List[Review]:
     user_outbox_url = data.get("outbox", "")
 
     # Fetch user's outbox
-    user_outbox = bookwyrm_get(user_outbox_url)
-    user_outbox_data = user_outbox.json()
+    try:
+        user_outbox_response = bookwyrm_get(user_outbox_url, activity_json=True)
+        user_outbox_data = user_outbox_response.json()
+        log.debug("Fetched BookWyrm user outbox data! Valid JSON!")
+    except requests.exceptions.JSONDecodeError:
+        log.error(
+            f"Invalid JSON returned by {user_outbox_url}. "
+            "Cannot parse user outbox."
+        )
+        return reviews
 
     outbox_first_url = user_outbox_data.get("first", "")
 
     # Fetch first page of outbox
-    outbox_first = bookwyrm_get(outbox_first_url)
-    outbox_first_data = outbox_first.json()
+    try:
+        outbox_first_response = bookwyrm_get(outbox_first_url, activity_json=True)
+        outbox_first_data = outbox_first_response.json()
+        log.debug("Fetched BookWyrm user outbox first page data! Valid JSON!")
+    except requests.exceptions.JSONDecodeError:
+        log.error(
+            f"Invalid JSON returned by {outbox_first_url}. "
+            "Cannot parse user outbox first page."
+        )
+        return reviews
 
     for item in outbox_first_data.get("orderedItems", []):
         if item.get("type") != "Article":
