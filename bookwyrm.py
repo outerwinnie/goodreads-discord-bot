@@ -60,7 +60,7 @@ def parse_book_name (s: str) -> str:
     return result
     
 
-def parse_score (s: str) -> int:
+def _old_parse_score (s: str) -> int:
     """Extracts score from a string , searching for the number between parenthesis "(4 stars)"
 
     Args:
@@ -140,7 +140,7 @@ def find_time_elapsed(entry: NavigableString, profile_url: str) -> str:
         return 'Unknown time'
 
 
-def fill_review (title: str, score: int, author: str,
+def fill_review (title: str, score: float, author: str,
                 url: str, image_url: str, user_url: str,
                 username: str, user_image_url: str, review_time_stamp: str,
                 review_text: str, review_url: str) -> Review:
@@ -171,6 +171,10 @@ def fill_review (title: str, score: int, author: str,
 
 def bookwyrm_get(url: str, *, activity_json: bool = False) -> requests.Response:
     """Make a GET request to BookWyrm with the appropriate headers."""
+    log.debug(f"Making GET request to {url} with activity_json={activity_json}")
+    if not url:
+        raise ValueError("URL must not be empty.")
+        
     headers = BOOKWYRM_HEADERS.copy()
     if activity_json:
         headers["Accept"] = "application/activity+json"
@@ -229,17 +233,20 @@ def parse_user_profile(user: BookUser) -> List[Review]:
         return reviews
 
     for item in outbox_first_data.get("orderedItems", []):
-        if item.get("type") != "Article":
+        log.debug(f"Processing item: {item.get('id', 'Unknown ID')} for user {username}")
+        if item.get("type") not in ("Article", "Document", "Note"): #If user doesn't leave a review but only gives it a score, it's classified as a Document, not an Article.
+            log.debug(f"Skipping item of type {item.get('type')} for user {username}")
             continue
 
         content = item.get("content", "")
-        if not content:
-            continue
+        #if not content:
+        #    continue
 
-        # Extract book name and score from review title
-        title = item.get("name", "")
-        score = parse_score(title)
-        book_name = parse_book_name(title)
+        score = item.get("rating", 0)
+        if score > 0:
+            log.debug(f"Found score {score} for review: {item.get('id', 'Unknown ID')}")
+        else:
+            log.debug(f"No score found for review: {item.get('id', 'Unknown ID')}")
 
         # Extract review text
         review_text_match = re.search(
@@ -261,7 +268,16 @@ def parse_user_profile(user: BookUser) -> List[Review]:
             else ""
         )
 
+        # If the score is not present and the item type is "Document", skip this review, because it's either a review without a score or a review that is not a book review (like a comment on a book).
+        if not score and item.get("type") == "Document":
+            continue
+
         book_reviewed = item.get("inReplyToBook", "")
+
+        # User can make a type "Note", for example a finished reading state, and those don't have a InReplyToBook field, so we skip those. 
+        if not book_reviewed:
+            log.warning(f"No book reviewed found for item {item.get('id', 'Unknown ID')}. Skipping.")
+            continue
 
         # Fetch book information
         book_response = bookwyrm_get(
@@ -271,14 +287,15 @@ def parse_user_profile(user: BookUser) -> List[Review]:
         book_data = book_response.json()
 
         cover = book_data.get("cover") or {}
-        book_title = cover.get("name", "")
+        book_title = book_data.get("title", "")
 
         # Extract author from strings such as:
         # "Han Kang: La vegetariana (Paperback, Español language, 2024)"
         author = "Unknown author"
+
         author_match = re.match(
             r"^(.+?):\s*(?=[^(]+(?:\(|$))",
-            book_title,
+            book_data.get("cover").get("name", ""),
         )
 
         if author_match:
@@ -290,7 +307,7 @@ def parse_user_profile(user: BookUser) -> List[Review]:
         review_url = item.get("id", "")
 
         review = fill_review(
-            book_name,
+            book_title,
             score,
             author,
             book_reviewed,

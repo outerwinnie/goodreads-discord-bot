@@ -31,7 +31,7 @@ headers = {
 }
 class Review(TypedDict):
     title: str
-    score: int
+    score: float
     author: str
     review_time_stamp: str
     url: str
@@ -110,10 +110,12 @@ def extract_user_from_url(url: str) -> dict:
         raise UrlNotValid
 
 
-def get_stars (score: int) -> str:
-    score_star = ''
-    for x in range(score):
-        score_star += '★'
+def get_stars(score: float) -> str:
+    score_star = '★' * int(score)
+
+    if score % 1 == 0.5:
+        score_star += '½'
+
     return score_star
 
 def is_old_review (user: BookUser, review: Review):
