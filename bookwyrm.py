@@ -286,22 +286,34 @@ def parse_user_profile(user: BookUser) -> List[Review]:
         )
         book_data = book_response.json()
 
-        cover = book_data.get("cover") or {}
+        cover = book_data.get("cover")
         book_title = book_data.get("title", "")
 
-        # Extract author from strings such as:
-        # "Han Kang: La vegetariana (Paperback, Español language, 2024)"
-        author = "Unknown author"
+        if cover:
+            # Extract author from the cover name
+            # e.g. "Han Kang: La vegetariana (Paperback, Español language, 2024)"
+            author_match = re.match(
+                r"^(.+?):\s*(?=[^(]+(?:\(|$))",
+                cover.get("name", ""),
+            )
 
-        author_match = re.match(
-            r"^(.+?):\s*(?=[^(]+(?:\(|$))",
-            book_data.get("cover").get("name", ""),
-        )
+            if author_match:
+                author = author_match.group(1).strip()
 
-        if author_match:
-            author = author_match.group(1).strip()
+        else:
+            # No cover, so get the (first) author from the authors list
+            authors = book_data.get("authors", [])
 
-        book_url_img = cover.get("url", "") or capsule_image_url
+            if authors:
+                author_response = bookwyrm_get(
+                    authors[0],
+                    activity_json=True,
+                )
+                author_data = author_response.json()
+
+                author = author_data.get("name", "Unknown author")
+
+        book_url_img = cover.get("url", "") if cover else capsule_image_url
 
         published = datetime.fromisoformat(item.get("published", ""))
         review_url = item.get("id", "")
