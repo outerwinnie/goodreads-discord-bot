@@ -94,7 +94,7 @@ class UpdatesClient(commands.Bot):
         await self.timer.start(channel)
                    
     # @tasks.loop(seconds=5) # For debug purposes
-    @tasks.loop(minutes=15)
+    @tasks.loop(minutes=5)
     async def timer(self, channel, force_check=False):
         global reviews
         rand_debug = random.randrange(0,4)
