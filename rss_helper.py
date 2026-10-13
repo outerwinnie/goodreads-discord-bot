@@ -125,24 +125,26 @@ class RSSHelper:
                             log.debug(f"Review URL found: {review_url}")
                             
                             # Extract Score
-                            if star_position != -1:
-                                score = info[star_position - 2: star_position].strip()
-                            elif stars_position != -1:
-                                score = info[stars_position - 2: stars_position].strip()
+                            if star_position != -1 or stars_position != -1:
+                                position = star_position if star_position != -1 else stars_position
+                                match = re.search(r'(\d+(?:\.\d+)?)\s*$', info[:position])
+
+                                if match:
+                                    score = match.group(1)
 
                             # Extract Review Text
-                                review_text = ""
-                                try:
-                                    info_parsed = BeautifulSoup(info, "html.parser")
-                                    br_tags = info_parsed.find_all("br")
-                                    for tag in br_tags:
-                                        review_dirty = tag.next_sibling.get_text()
-                                        review_text = review_text + re.sub(r'^\s*', '',review_dirty).strip() + "\n"
-                                        review_text = re.sub(r'^\s*', '',review_text)
-                                except AttributeError:
-                                    log.debug("No review text found.")
-                                except Exception as error:
-                                    logging.error(traceback.format_exc())
+                            review_text = ""
+                            try:
+                                info_parsed = BeautifulSoup(info, "html.parser")
+                                br_tags = info_parsed.find_all("br")
+                                for tag in br_tags:
+                                    review_dirty = tag.next_sibling.get_text()
+                                    review_text = review_text + re.sub(r'^\s*', '',review_dirty).strip() + "\n"
+                                    review_text = re.sub(r'^\s*', '',review_text)
+                            except AttributeError:
+                                log.debug("No review text found.")
+                            except Exception as error:
+                                logging.error(traceback.format_exc())
                             
                             # Extract Images
                             image_url = info[info.find('src=') + 5: info.find('" title')]
@@ -153,7 +155,7 @@ class RSSHelper:
                             
                             review = {
                                 "title": title,
-                                "score": int(score),
+                                "score": float(score),
                                 "author": author,
                                 "url": url,
                                 "image_url": image_url,

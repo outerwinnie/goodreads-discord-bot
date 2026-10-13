@@ -112,9 +112,14 @@ def extract_user_from_url(url: str) -> dict:
 
 def get_stars(score: float) -> str:
     score_star = '★' * int(score)
+    fraction = score % 1
 
-    if score % 1 == 0.5:
+    if fraction == 0.75:
+        score_star += '¾'
+    elif fraction == 0.5:
         score_star += '½'
+    elif fraction == 0.25:
+        score_star += '¼'
 
     return score_star
 
