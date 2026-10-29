@@ -1,9 +1,7 @@
 import traceback
 from pprint import pprint
 import json, re
-from json import JSONDecodeError
 from typing import List
-import feedparser
 import logging
 import requests
 import datetime
@@ -18,8 +16,6 @@ import bookwyrm
 
 USERS_JSON_FILE_PATH = "data/users.json"
 
-
-
 FORMAT = "%(message)s"
 logging.basicConfig(level=LOGLEVEL,
                     format=FORMAT,
@@ -28,175 +24,280 @@ logging.basicConfig(level=LOGLEVEL,
 log = logging.getLogger("rich")
 console = Console()
 
+def parse_goodreads_date(ts_str: str) -> str:
+    if not ts_str:
+        return ""
+    pacific_tz = pytz.timezone("America/Los_Angeles")
+    target_tz = pytz.timezone(TIME_ZONE)
+    for fmt in ("%B %d, %Y %H:%M", "%B %d, %Y %I:%M%p", "%b %d, %Y %I:%M%p", "%b %d, %Y %I:%M %p"):
+        try:
+            dt = datetime.datetime.strptime(ts_str.strip(), fmt)
+            dt_pacific = pacific_tz.localize(dt)
+            return dt_pacific.astimezone(target_tz).strftime(DATE_FORMAT_OUTPUT)
+        except ValueError:
+            pass
+    return ""
+
+
+def extract_score(stars_el, action_text: str = "") -> float:
+    if not stars_el:
+        return 0.0
+
+    # 1. Sum up star spans (p10 = 1.0, p6/p5 = 0.5, p3/p2 = 0.25, p7/p8 = 0.75)
+    score = 0.0
+    for span in stars_el.find_all("span", class_=re.compile(r"staticStar")):
+        classes = span.get("class", [])
+        for c in classes:
+            if c == "p10":
+                score += 1.0
+            elif c in ("p6", "p5"):
+                score += 0.5
+            elif c in ("p3", "p2"):
+                score += 0.25
+            elif c in ("p7", "p8"):
+                score += 0.75
+
+    if score > 0:
+        return score
+
+    # 2. Check title attribute or action text for numerical rating (e.g. "4.5" or "4.25")
+    title_attr = (stars_el.get("title") or "").strip()
+    m = re.search(r"(\d+(?:\.\d+)?)", title_attr)
+    if m and any(char in title_attr for char in (".", "star")):
+        return float(m.group(1))
+
+    # 3. Traditional Goodreads tooltip text (e.g. "really liked it")
+    label_map = {
+        "did not like it": 1.0,
+        "it was ok": 2.0,
+        "liked it": 3.0,
+        "really liked it": 4.0,
+        "it was amazing": 5.0,
+    }
+    if title_attr.lower() in label_map:
+        return label_map[title_attr.lower()]
+
+    # 4. Fallback: regex search in action text
+    m_act = re.search(r"(\d+(?:\.\d+)?)\s*stars?", action_text, re.IGNORECASE)
+    if m_act:
+        return float(m_act.group(1))
+
+    return 0.0
+
+
+def get_widget_ratings(user_id: str) -> dict:
+    url = f"https://www.goodreads.com/review/custom_widget/{user_id}"
+    try:
+        r = requests.get(url, headers=HEADERS, timeout=10)
+        start = r.text.find("var widget_code = '")
+        end = r.text.rfind("var widget_div =")
+        if start == -1 or end == -1:
+            return {"by_id": {}, "by_title": {}}
+        raw = r.text[start + len("var widget_code = '"): end].rstrip("\n' ")
+        raw = raw.replace('\\\"', '"').replace(r'\/', '/').replace(r"\'", "'").replace(r'\n', '\n')
+
+        ratings_by_id = {}
+        ratings_by_title = {}
+        chunks = re.split(r'class=[\"\']gr_custom_book_container_[\"\']', raw)
+        for chunk in chunks[1:]:
+            m_rating = re.search(r'class=[\"\']gr_custom_rating_[\"\']>(.*?)(?:</div>|<div)', chunk, re.S)
+            if not m_rating:
+                continue
+            rating_html = m_rating.group(1)
+            score = 0.0
+            for img_src in re.findall(r'gr_flat_red_star_([a-zA-Z0-9_]+)\.png', rating_html):
+                if img_src == "active":
+                    score += 1.0
+                elif img_src == "75pct":
+                    score += 0.75
+                elif img_src == "50pct":
+                    score += 0.50
+                elif img_src == "25pct":
+                    score += 0.25
+
+            m_rev = re.search(r'/review/show/(\d+)', chunk)
+            if m_rev:
+                ratings_by_id[m_rev.group(1)] = score
+
+            m_title = re.search(r'title=[\"\']([^\"\']+)[\"\']', chunk)
+            if m_title:
+                ratings_by_title[m_title.group(1).lower().strip()] = score
+
+        return {"by_id": ratings_by_id, "by_title": ratings_by_title}
+    except Exception:
+        return {"by_id": {}, "by_title": {}}
+
 
 def get_user_image(user_id: str) -> str:
     user_url = f"https://www.goodreads.com/user/show/{user_id}"
-    #page = requests.get(user_url)
-    headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3',
-    'Accept-Language': 'en-US,en;q=0.9'
-    }    
-    soup = BeautifulSoup(requests.get(user_url,headers=HEADERS).text, "html.parser")
     try:
-        picture_elements = soup.find("div", class_="leftAlignedProfilePicture").find("a")
-        for element in picture_elements:
-            if element is not None:
-                user_image_url = element["src"]
+        soup = BeautifulSoup(requests.get(user_url, headers=HEADERS, timeout=10).text, "html.parser")
+        picture_elements = soup.find("div", class_="leftAlignedProfilePicture")
+        if picture_elements and picture_elements.find("img"):
+            user_image_url = picture_elements.find("img").get("src")
+            if user_image_url:
                 log.debug(f"URL found for {user_id} : {user_image_url}")
                 return user_image_url
-    except Exception as e:
-        log.info(f"No picture found for user {user_id}, trying if author...")
-        
-    # try if author page
-    try:
-        picture_elements = soup.find("div", class_="leftContainer authorLeftContainer").find("a")
-        for element in picture_elements:
-            if element is not None:
-                user_image_url = element["src"]
+
+        author_elements = soup.find("div", class_="leftContainer authorLeftContainer")
+        if author_elements and author_elements.find("img"):
+            user_image_url = author_elements.find("img").get("src")
+            if user_image_url:
                 log.debug(f"URL found for {user_id} : {user_image_url}")
                 return user_image_url
     except Exception as e:
         log.info(f"No picture found for user {user_id}, using generic")
-        
-    ## Image not found, return generic   
+
     user_image_url = "https://i.imgur.com/9pNffkj.png"
     log.debug(f"Not found {user_id} : {user_image_url}")
     return user_image_url
-    
-
-
-# data = get_data_from_users_json()
 
 
 class RSSHelper:
 
-    # Get RSS description
     def get_rss_data_goodreads(self, users: List[BookUser]) -> List[Review]:
         reviews = []
-        #user_list: List[BookUser] = [user for user in users]
         for user in users:
             if user["service"] != GOODREADS_SERVICE:
                 continue
             try:
-                rss_feed_url = f'https://www.goodreads.com/user/updates_rss/{user["id"]}'
-                log.debug(f"Trying for {user['user_url']}")
+                user_id = user["id"]
+                url = f"https://www.goodreads.com/user/delayable_user_show/{user_id}"
+                log.debug(f"Checking Goodreads updates for {user['user_url']}")
 
-                feedparser.USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0"
-                rss_feed = feedparser.parse(rss_feed_url, referrer="http://google.com")
-                log.debug(f"Parser HTML status: {rss_feed.status}")
+                r = requests.get(url, headers=HEADERS, timeout=15)
+                if r.status_code != 200:
+                    log.warning(f"Couldn't fetch Goodreads updates for {user_id}, status {r.status_code}")
+                    continue
 
-                # Extract Username
-                index = rss_feed.feed.title.find("'s Updates")
-                username = rss_feed.feed.title[:index].rstrip()
-                log.debug(f"Found user: {username}, {len(rss_feed.entries)} entries.")
-                # log.debug(f"{rss_feed.feed}")
+                widget_ratings = get_widget_ratings(user_id)
+                soup = BeautifulSoup(r.text, "html.parser")
+                h2 = soup.find("h2")
+                default_username = re.sub(r"[’']s Recent Updates.*$", "", h2.get_text(strip=True)) if h2 else ""
+                user_image_url = get_user_image(user_id)
 
-                # Get stars position
-                for i, entry in enumerate(rss_feed.entries):
+                updates = soup.find_all("tr", class_="update", attrs={"data-timestamp": True})
+                log.debug(f"Found user: {default_username}, {len(updates)} entries.")
+
+                for i, u in enumerate(updates):
                     try:
-                        #log.debug(f"Entry #{i}: {entry}")
-                        #log.debug(f"Entry description: {entry.description}")
-                        info = entry.description
-                        second_href = info[info[info.find("href") + 1:].find("href"):]
-                        star_position = info.find('star to <a class="bookTitle"')
-                        stars_position = info.find('stars to <a class="bookTitle"')
-                        is_starred = star_position != -1 or stars_position != -1
+                        stars_el = u.find(class_="staticStars")
+                        action_el = u.find(class_="updateAction")
+                        action_text = action_el.get_text(" ", strip=True) if action_el else ""
 
-                        # Only reviews with Stars
-                        # log.debug(f"Star found? {is_starred} Position? {stars_position}")
-                        if is_starred:
-                            log.debug("Review found!")
+                        if not stars_el and "rated a book" not in action_text:
+                            continue
 
-                            # Extract Review Timestamp
-                            date = datetime.datetime.strptime(entry.published, DATE_FORMAT_INPUT)
-                            review_date_timezoned = date.astimezone(pytz.timezone(TIME_ZONE))
-                            
-                            
-                            # Extract Title
-                            title = second_href[second_href.find(">") + 1: second_href.find("</a>")]
-                            log.debug(f"Title found: {title}")
+                        # Extract book title and URL
+                        title_el = u.find("a", class_="bookTitle")
+                        if not title_el:
+                            continue
+                        title = title_el.get_text(strip=True)
+                        book_url = title_el.get("href", "")
+                        if book_url.startswith("/"):
+                            book_url = f"https://www.goodreads.com{book_url}"
 
-                            # Extract Author
-                            author_extract = second_href[second_href.find('<a class="authorName"'):]
-                            author = author_extract[author_extract.find(">") + 1: author_extract.find("</a>")]
+                        # Extract author
+                        author_el = u.find("a", class_="authorName")
+                        author = author_el.get_text(strip=True) if author_el else ""
 
-                            # Extract Review URL
-                            review_url = entry.link
-                            log.debug(f"Review URL found: {review_url}")
-                            
-                            # Extract Score
-                            if star_position != -1 or stars_position != -1:
-                                position = star_position if star_position != -1 else stars_position
-                                match = re.search(r'(\d+(?:\.\d+)?)\s*$', info[:position])
+                        # Extract review URL
+                        review_url = book_url
+                        rev_id = None
+                        rev_a = u.find("a", href=re.compile(r"^/review/show/\d+"))
+                        if not rev_a:
+                            sib = u.find_next_sibling("tr")
+                            while sib and not sib.has_attr("data-timestamp"):
+                                rev_a = sib.find("a", href=re.compile(r"^/review/show/\d+"))
+                                if rev_a:
+                                    break
+                                sib = sib.find_next_sibling("tr")
+                        if rev_a:
+                            rev_path = rev_a["href"].split("?")[0]
+                            review_url = f"https://www.goodreads.com{rev_path}" if rev_path.startswith("/") else rev_path
+                            m_rev_id = re.search(r"/review/show/(\d+)", rev_path)
+                            if m_rev_id:
+                                rev_id = m_rev_id.group(1)
 
-                                if match:
-                                    score = match.group(1)
+                        # Extract score: prefer exact fractional rating from custom_widget, fallback to CSS classes
+                        score = 0.0
+                        if rev_id and rev_id in widget_ratings.get("by_id", {}):
+                            score = widget_ratings["by_id"][rev_id]
+                        elif title.lower().strip() in widget_ratings.get("by_title", {}):
+                            score = widget_ratings["by_title"][title.lower().strip()]
 
-                            # Extract Review Text
-                            review_text = ""
-                            try:
-                                info_parsed = BeautifulSoup(info, "html.parser")
-                                br_tags = info_parsed.find_all("br")
-                                for tag in br_tags:
-                                    review_dirty = tag.next_sibling.get_text()
-                                    review_text = review_text + re.sub(r'^\s*', '',review_dirty).strip() + "\n"
-                                    review_text = re.sub(r'^\s*', '',review_text)
-                            except AttributeError:
-                                log.debug("No review text found.")
-                            except Exception as error:
-                                logging.error(traceback.format_exc())
-                            
-                            # Extract Images
-                            image_url = info[info.find('src=') + 5: info.find('" title')]
+                        if not score:
+                            score = extract_score(stars_el, action_text)
 
-                            # Extract URL
-                            url = info[9: info.find('">')]
-                            user_image_url = get_user_image(user["id"])
-                            
-                            review = {
-                                "title": title,
-                                "score": float(score),
-                                "author": author,
-                                "url": url,
-                                "image_url": image_url,
-                                "user_url": user["user_url"],
-                                "username": username,
-                                "user_image_url": user_image_url,
-                                "review_text": review_text,
-                                "review_url": review_url,
-                                "review_time_stamp": review_date_timezoned.strftime(DATE_FORMAT_OUTPUT),
-                            }
-                            reviews.append(review)
-                            log.debug(f"Review found from: {username} for: {title}")
-                            if is_old_review(user, review):
-                                log.info(f"Finished checking reviews for user {username}, found old review")
-                                break
-                    except AttributeError:
-                        log.debug(f"Bad entry: {i}")
+                        if not score:
+                            continue
+
+                        # Extract review text
+                        review_text = ""
+                        text_el = u.find(id=re.compile(r"^freeTextreview")) or u.find(id=re.compile(r"^freeTextContainerreview"))
+                        if not text_el:
+                            sib = u.find_next_sibling("tr")
+                            while sib and not sib.has_attr("data-timestamp"):
+                                text_el = sib.find(id=re.compile(r"^freeTextreview")) or sib.find(id=re.compile(r"^freeTextContainerreview"))
+                                if text_el:
+                                    break
+                                sib = sib.find_next_sibling("tr")
+                        if text_el:
+                            review_text = text_el.get_text("\n", strip=True)
+
+                        # Extract cover image
+                        img_el = u.find("div", class_="updateImage")
+                        img_tag = img_el.find("img") if img_el else None
+                        image_url = img_tag.get("src", "") if img_tag else ""
+
+                        # Extract timestamp
+                        raw_ts = u.get("data-timestamp")
+                        review_time = parse_goodreads_date(raw_ts) if raw_ts else ""
+                        if not review_time:
+                            ts_tag = u.find("a", class_="updatedTimestamp")
+                            if ts_tag:
+                                review_time = parse_goodreads_date(ts_tag.get_text(strip=True))
+                        if not review_time:
+                            review_time = datetime.datetime.now().strftime(DATE_FORMAT_OUTPUT)
+
+                        # Extract username
+                        user_a = action_el.find("a", href=re.compile(r"/user/show/")) if action_el else None
+                        username = user_a.get_text(strip=True) if user_a else default_username
+
+                        review = {
+                            "title": title,
+                            "score": float(score),
+                            "author": author,
+                            "url": book_url,
+                            "image_url": image_url,
+                            "user_url": user["user_url"],
+                            "username": username,
+                            "user_image_url": user_image_url,
+                            "review_text": review_text,
+                            "review_url": review_url,
+                            "review_time_stamp": review_time,
+                        }
+                        reviews.append(review)
+                        log.debug(f"Review found from: {username} for: {title}")
+                        if is_old_review(user, review):
+                            log.info(f"Finished checking reviews for user {username}, found old review")
+                            break
                     except Exception as error:
-                        console.print_exception()
-                        # log.debug(f"Bad entry: {entry}")
+                        log.debug(f"Bad entry #{i} for user {user_id}: {error}")
             except Exception as error:
-                # logging.error(traceback.format_exc())
-                log.warning(f"Couldn't connect to RSS https://www.goodreads.com/user/updates_rss/{user['id']}")
-                #return []
+                log.warning(f"Couldn't connect to Goodreads for user {user['id']}: {error}")
 
         return reviews
 
-    def get_bookwyrm_data (self, users: List[BookUser]) -> List[Review]:
+    def get_bookwyrm_data(self, users: List[BookUser]) -> List[Review]:
         bookwyrm_reviews = bookwyrm.get_users_reviews(users)
         return bookwyrm_reviews
-    
+
     def get_reviews(self, users: List[BookUser]) -> List[Review]:
         goodreads_reviews = self.get_rss_data_goodreads(users)
         bookwyrm_reviews = self.get_bookwyrm_data(users)
         return goodreads_reviews + bookwyrm_reviews
-            
+
+
 # Dependant Variables
 rsh = RSSHelper()
-
-# ------------------- Debug ----------------------
-# info = rsh.get_rss_data_goodreads([50670314, 35497141])
-# user_id = 35497141
-# rss_feed_url = f'https://www.goodreads.com/user/updates_rss/{user_id}'
-# rss_feed = feedparser.parse(rss_feed_url, referrer="http://google.com")
