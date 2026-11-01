@@ -1,6 +1,7 @@
 from typing import TypedDict
 import logging
 import datetime, pytz
+import re
 from urllib.parse import urlparse
 from bs4 import BeautifulSoup
 import requests
@@ -59,11 +60,11 @@ def extract_user_from_url(url: str) -> dict:
     if parsed_url.hostname == "goodreads.com" or parsed_url.hostname == "www.goodreads.com":
         if "/author/" in parsed_url.path:
             try: 
-                soup = BeautifulSoup(requests.get(url,headers=HEADERS).text, "html.parser")
-                author_url = soup.find('link', rel='alternate', title='Bookshelves')
-                if author_url:
-                    parsed_url = urlparse(author_url.get('href'))
-                    user_id: str = parsed_url.path.split('/')[-1]
+                soup = BeautifulSoup(requests.get(url, headers=HEADERS, timeout=10).text, "html.parser")
+                user_link = soup.find('a', href=re.compile(r'/(?:review/list|user/show)/(\d+)'))
+                if user_link:
+                    match = re.search(r'/(?:review/list|user/show)/(\d+)', user_link['href'])
+                    user_id: str = match.group(1)
                     user_url = f"https://www.goodreads.com/user/show/{user_id}"
                     user = {
                         "service": GOODREADS_SERVICE,
@@ -74,6 +75,8 @@ def extract_user_from_url(url: str) -> dict:
                 else:
                     log.error(f"Author URL not found!")
                     raise UrlNotValid
+            except UrlNotValid:
+                raise
             except Exception as e:
                 log.error(f"Issue with author URL!")
                 raise UrlNotValid
@@ -112,7 +115,7 @@ def extract_user_from_url(url: str) -> dict:
 
 def get_stars(score: float) -> str:
     score_star = '★' * int(score)
-    fraction = score % 1
+    fraction = round(score % 1, 2)
 
     if fraction == 0.75:
         score_star += '¾'
@@ -124,9 +127,15 @@ def get_stars(score: float) -> str:
     return score_star
 
 def is_old_review (user: BookUser, review: Review):
-    last_review_ts = datetime.datetime.strptime(user["last_review_ts"], DATE_FORMAT_OUTPUT)
+    if not user.get("last_review_ts"):
+        return False
+    try:
+        last_review_ts = datetime.datetime.strptime(user["last_review_ts"], DATE_FORMAT_OUTPUT)
+        review_ts = datetime.datetime.strptime(review["review_time_stamp"], DATE_FORMAT_OUTPUT)
+    except (ValueError, TypeError):
+        return False
     if user["user_url"] == review["user_url"]:
-        if (last_review_ts.timestamp() < datetime.datetime.strptime(review["review_time_stamp"],DATE_FORMAT_OUTPUT).timestamp()):
+        if (last_review_ts.timestamp() < review_ts.timestamp()):
             #new_reviews.append(review)
             log.debug(f'User Review Datetime: {user["last_review_ts"]}')
             log.info(f"New review for {review['title']} by {user['user_url']} on {review['review_time_stamp']}")
